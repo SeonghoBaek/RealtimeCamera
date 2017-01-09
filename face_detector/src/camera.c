@@ -127,7 +127,7 @@ double get_wall_time()
 
 void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix)
 {
-    image **alphabet = load_alphabet();
+    image **alphabet = NULL; //load_alphabet();
     int delay = frame_skip;
 
     redisReply      *reply;
