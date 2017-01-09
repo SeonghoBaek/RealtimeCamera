@@ -25,8 +25,8 @@ from sklearn.naive_bayes import GaussianNB
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
-baseDir = '/home/major/Development/RealtimeCamera'
-modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
+baseDir = fileDir + '/../'
+modelDir = os.path.join(fileDir, baseDir + 'openface', 'models')
 dlibModelDir = os.path.join(modelDir, 'dlib')
 openfaceModelDir = os.path.join(modelDir, 'openface')
 
@@ -55,8 +55,9 @@ p = rds.pubsub()
 p.subscribe('camera')
 (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((HOST, PORT))
+# No need to connect identification server
+#sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#sock.connect((HOST, PORT))
 
 def getRep(imgPath, multiple=False):
 

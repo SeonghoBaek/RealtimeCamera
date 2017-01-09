@@ -211,7 +211,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
     image original_image = copy_image(im);
 
-    gUploadStep = (++gUploadStep % 4);
+    gUploadStep = (++gUploadStep % 15);
 
     for(i = 0; i < num; ++i)
     {
