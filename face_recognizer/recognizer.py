@@ -25,7 +25,7 @@ from sklearn.naive_bayes import GaussianNB
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
-baseDir = '/home/major/Development/RealtimeCamera'
+baseDir = fileDir + '/../' 
 modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
 dlibModelDir = os.path.join(modelDir, 'dlib')
 openfaceModelDir = os.path.join(modelDir, 'openface')
@@ -56,28 +56,25 @@ p.subscribe('camera')
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
 
+show_time = False
+
 def getRep(imgPath, multiple=False):
 
-    start = time.time()
+    if show_time is True:
+        start = time.time()
     bgrImg = cv2.imread(imgPath)
     if bgrImg is None:
         raise Exception("Unable to load image: {}".format(imgPath))
 
-
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
-
-    #print(rgbImg.shape)
 
     rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
 
-    #print(rgbImg.shape)
-
-    if args.verbose:
-        print("  + Original size: {}".format(rgbImg.shape))
-    if args.verbose:
+    if show_time is True:
         print("Loading the image took {} seconds.".format(time.time() - start))
 
-    start = time.time()
+    if show_time is True:
+        start = time.time()
 
     if multiple:
         bbs = align.getAllFaceBoundingBoxes(rgbImg)
@@ -88,13 +85,13 @@ def getRep(imgPath, multiple=False):
         #raise Exception("Unable to find a face: {}".format(imgPath))
         print("Unable to find a face")
         return []
-    if args.verbose:
-        print("Face detection took {} seconds.".format(time.time() - start))
+
+    if show_time is True:
+        print("BBox took {} seconds.".format(time.time() - start))
 
     reps = []
 
     for bb in bbs:
-
         start = time.time()
         alignedFace = align.align(
             args.imgDim,
@@ -103,17 +100,21 @@ def getRep(imgPath, multiple=False):
             landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
         if alignedFace is None:
             raise Exception("Unable to align image: {}".format(imgPath))
-        if args.verbose:
-            print("Alignment took {} seconds.".format(time.time() - start))
-            print("This bbox is centered at {}, {}".format(bb.center().x, bb.center().y))
 
-        start = time.time()
+        if show_time is True:
+            print("Alignment took {} seconds.".format(time.time() - start))
+        
+        #print("This bbox is centered at {}, {}".format(bb.center().x, bb.center().y))
+
+        if show_time is True:
+            start = time.time()
+
         rep = net.forward(alignedFace)
 
-        if args.verbose:
-            print("Neural network forward pass took {} seconds.".format(
-                time.time() - start))
+        if show_time is True:
+            print("DNN forward pass took {} seconds.".format(time.time() - start))
         reps.append((bb.center().x, rep))
+
     sreps = sorted(reps, key=lambda x: x[0])
     return sreps
 
@@ -184,7 +185,6 @@ def inferAndSendRep(frameNum, img):
 
 
 def infer(img, db=False):
-    #print("\n=== {} ===".format(img))
     reps = getRep(img, False)
 
     if not reps:
@@ -244,7 +244,7 @@ def infer(img, db=False):
             if args.verbose:
                 print("Prediction took {} seconds.".format(time.time() - start))
             else:
-                print("Predict {} with {:.2f} confidence.".format(person, confidence))
+                print("{} : {:.2f} %".format(person, 100* confidence))
             if isinstance(clf, GMM):
                 dist = np.linalg.norm(rep - clf.means_[maxI])
                 print("  + Distance from the mean: {}".format(dist))
@@ -262,7 +262,7 @@ while True:
 
             frameNum = ar[0]
             ar = ar[1:]
-            print frameNum
+            #print frameNum
             #print ar
             fileName = "/tmp/input.jpg"
             jpgFile = open(fileName, "wb");

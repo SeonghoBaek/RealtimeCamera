@@ -108,23 +108,16 @@ $ sudo pip2 install -r training/requirements.txt
 
  - 1. Connect Webcam
 
- - 2. Build and run face_identifier
- 	cd face_identifier
-	cmake ./
-	make -j4
-	identifier
+ - 2. Run setup.sh
+
+ - 2. Run face_identifier
+ 	face_identifier/identifier
 
  - 3. Run face_recoginzer
- 	python face_recoginzer.py
+ 	python face_recoginzer/recognizer.py
 	 
- - 4. Build and run face_detector
-	cd face_detector
-	build detector: 
-		make -j4
-	cd models
-	Read README.txt and follow the instruction to download predefined FDDB trained weight file
-	Run detector
-	run_camera.sh
+ - 4. Run face_detector
+	face_detector/run_camera.sh
 
 
 Enjoy.
