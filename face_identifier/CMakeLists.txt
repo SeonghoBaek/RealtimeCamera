@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 2.7)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --std=c++11 -pthread")
 include_directories(/usr/include /usr/local/include /usr/local/include/hiredis)
 add_executable(identifier ${SOURCE_FILES} Indentifier.cpp Classifier.cpp Classifier.h RedisIO.cpp RedisIO.h Common.h Lock.cpp Lock.h Looper.cpp Looper.h Log.h Log.cpp Thread.h VectorSubscriber.cpp VectorSubscriber.h VectorNetSubscriber.cpp VectorNetSubscriber.h VectorQueue.cpp VectorQueue.h VectorClassFinder.cpp VectorClassFinder.h)

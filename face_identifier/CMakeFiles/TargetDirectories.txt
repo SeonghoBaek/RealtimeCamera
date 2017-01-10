@@ -1,3 +1,0 @@
-/home/major/Development/RealtimeCamera/face_identifier/CMakeFiles/edit_cache.dir
-/home/major/Development/RealtimeCamera/face_identifier/CMakeFiles/rebuild_cache.dir
-/home/major/Development/RealtimeCamera/face_identifier/CMakeFiles/identifier.dir
