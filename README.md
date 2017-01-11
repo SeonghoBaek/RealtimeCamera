@@ -5,10 +5,6 @@ Requirement
 	- REDIS Server / hiredis / PyRedis 
 	- OpenCV2 or OpenCV3 for support CUDA
 		- Note) You can install libopencv-dev. But cpu only.
-	- Darknet
-		- C/C++ dnn framework
-	- Openface
-		- You can user docker image which does not support gpgpu
 	- Torch
 		- Case of building Native Openface 
 
@@ -25,7 +21,7 @@ Edit redis.conf
 	- protected-mode no : Grant external host
 Run server: redis-servier path/to/redis.conf
 
-<Openface & OpenCV Install Step>
+<OpenCV Install Step>
 
 1. Install following minimum dependency libraries
 $ sudo apt-get update
@@ -57,16 +53,6 @@ $ cmake -D CMAKE_BUILD_TYPE=RELEASE -D CMAKE_INSTALL_PREFIX=/usr/local ..
 
 $ make
 $ sudo make install
-
-<Darknet Install>
-cd RealtimeCamera/darknet
-Edit Makefile: gpu support, opencv support and so on
-make -j4
-cd data/labels
-python make_labels.py
-
-Done!
-
 
 <DLIB package for python>
 $ wget https://github.com/davisking/dlib/releases/download/v18.16/dlib-18.16.tar.bz2
