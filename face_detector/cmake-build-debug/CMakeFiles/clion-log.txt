@@ -1,0 +1,4 @@
+/opt/clion-2016.3.2/bin/cmake/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /home/major/Development/RealtimeCamera/face_detector
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/major/Development/RealtimeCamera/face_detector/cmake-build-debug
