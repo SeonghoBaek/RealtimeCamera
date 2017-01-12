@@ -175,9 +175,6 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
         cap = cvCaptureFromCAM(cam_index);
     }
 
-    sleep(1);
-
-
     if(!cap)
     {
         error("Couldn't connect to webcam.\n");
@@ -203,6 +200,8 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
         }
     }
 #endif
+
+    run_identifier();
 
     layer l = net.layers[net.n-1];
     int j;
@@ -248,7 +247,7 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
 
     double before = get_wall_time();
 
-    run_identifier();
+
 
     while(1)
     {
