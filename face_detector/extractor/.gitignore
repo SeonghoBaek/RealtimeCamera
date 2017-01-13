@@ -4,6 +4,7 @@
 *.out
 *.png
 mnist/
+data/
 caffe/
 grasp/
 images/

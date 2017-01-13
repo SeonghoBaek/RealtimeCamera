@@ -14,8 +14,7 @@ cd face_detector
 
 echo "Building face dectector..wait"
 
-make  > /dev/null
+make clean;make  > /dev/null
 
 echo "Done."
 popd > /dev/null
-

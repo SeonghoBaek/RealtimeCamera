@@ -156,7 +156,9 @@ while True:
             ar = np.array(temp, dtype=np.uint8)
 
             frameNum = ar[0]
-            ar = ar[1:]
+            center_x = ar[1]
+            center_y = ar[2]
+            ar = ar[3:]
 
             userName = args.name
             baseDir = "./input"
@@ -166,8 +168,7 @@ while True:
 
             fileSeqNum += 1
             faceFile = baseDir + "/" + userName + "/face_" + str(fileSeqNum) + ".jpg"
-            userdataFile = baseDir + "/userdata/vector.dat"
-
+           
             if not os.path.exists(faceFile):
                 dir = os.path.dirname(faceFile)
 

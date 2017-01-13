@@ -65,11 +65,14 @@ def getRep(imgPath, multiple=False):
 
     start = time.time()
 
+    #drect = dlib.rectangle(long(0), long(0), long(rgbImg.shape[1]), long(rgbImg.shape[0]))
+
     if multiple:
         bbs = align.getAllFaceBoundingBoxes(rgbImg)
     else:
         bb1 = align.getLargestFaceBoundingBox(rgbImg)
         bbs = [bb1]
+        
     if len(bbs) == 0 or (not multiple and bb1 is None):
         raise Exception("Unable to find a face: {}".format(imgPath))
     if args.verbose:

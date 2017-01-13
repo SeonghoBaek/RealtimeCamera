@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 import redis
 import array
 import argparse
@@ -9,26 +9,24 @@ import cv2
 import pickle
 import time
 import ast
-import dlib
+import shutil
 import socket
 import sys
 import struct
-
-from sklearn.pipeline import Pipeline
-from sklearn.lda import LDA
-from sklearn.preprocessing import LabelEncoder
-from sklearn.svm import SVC
-from sklearn.grid_search import GridSearchCV
+import dlib
 from sklearn.mixture import GMM
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.naive_bayes import GaussianNB
+
+
+label_list = ['ByongrakSeo', 'DaeyoungPark', 'HyungkiNoh', 'JangHyungLee', 'KiyoungKim', 'KwangheeLee', 'MinsamKo', 'SanghoonLee', 'SeonghoBaek', 'YonbeKim', 'Unknown']
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
 baseDir = fileDir + '/../' 
 modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
+inputDir = baseDir + 'face_register/input'
 dlibModelDir = os.path.join(modelDir, 'dlib')
 openfaceModelDir = os.path.join(modelDir, 'openface')
+haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
 
 HOST, PORT = "127.0.0.1", 55555
 
@@ -48,13 +46,28 @@ args = parser.parse_args()
 align = openface.AlignDlib(args.dlibFacePredictor)
 net = openface.TorchNeuralNet(args.networkModel, args.imgDim)
 
-rds = redis.StrictRedis(host='127.0.0.1',port=6379,db=0)
-p = rds.pubsub()
-p.subscribe('camera')
+redis_ready = False
+
+try:
+    rds = redis.StrictRedis(host='127.0.0.1',port=6379,db=0)
+    p = rds.pubsub()
+    p.subscribe('camera')
+    redis_ready = True
+
+except:
+    redis_ready = False
+
 (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
 
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect((HOST, PORT))
+sock_ready = False
+
+try:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.connect((HOST, PORT))
+    sock_ready = True
+    print('Connected')
+except:
+    sock_ready = False
 
 show_time = False
 
@@ -62,13 +75,15 @@ def getRep(imgPath, multiple=False):
 
     if show_time is True:
         start = time.time()
+
     bgrImg = cv2.imread(imgPath)
+
     if bgrImg is None:
         raise Exception("Unable to load image: {}".format(imgPath))
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
 
-    rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
+    #rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
 
     if show_time is True:
         print("Loading the image took {} seconds.".format(time.time() - start))
@@ -76,14 +91,18 @@ def getRep(imgPath, multiple=False):
     if show_time is True:
         start = time.time()
 
+    #drect = dlib.rectangle(long(0), long(0), long(rgbImg.shape[1]), long(rgbImg.shape[0]))
+
     if multiple:
         bbs = align.getAllFaceBoundingBoxes(rgbImg)
+
     else:
         bb1 = align.getLargestFaceBoundingBox(rgbImg)
         bbs = [bb1]
+
     if len(bbs) == 0 or (not multiple and bb1 is None):
         #raise Exception("Unable to find a face: {}".format(imgPath))
-        print("Unable to find a face")
+        #print("Unable to find a face")
         return []
 
     if show_time is True:
@@ -98,6 +117,7 @@ def getRep(imgPath, multiple=False):
             rgbImg,
             bb,
             landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
+
         if alignedFace is None:
             raise Exception("Unable to align image: {}".format(imgPath))
 
@@ -113,6 +133,7 @@ def getRep(imgPath, multiple=False):
 
         if show_time is True:
             print("DNN forward pass took {} seconds.".format(time.time() - start))
+
         reps.append((bb.center().x, rep))
 
     sreps = sorted(reps, key=lambda x: x[0])
@@ -161,113 +182,149 @@ def getL2Difference(vec1, vec2):
     return dist
 
 
-def inferAndSendRep(frameNum, img):
-
-    reps = getRep(img, False)
+def infer(fileName):
+    reps = getRep(fileName, False)
+    confidence = 0.0
 
     if not reps:
-        print("reps null")
+        print("Who are you?")
+        return 'Unknown', confidence
+
+    if len(reps) > 1:
+        print("List of faces in image from left to right")
+
+    for r in reps:
+        rep = r[1].reshape(1, -1)
+        bbx = r[0]
+        start = time.time()
+        predictions = clf.predict_proba(rep).ravel()
+        maxI = np.argmax(predictions)
+        person = le.inverse_transform(maxI)
+        confidence = predictions[maxI]
+
+        if show_time is True:
+            print("Prediction took {} seconds.".format(time.time() - start))
+
+        if confidence < 0.5:
+            person = 'Unknown'
+
+        if isinstance(clf, GMM):
+            dist = np.linalg.norm(rep - clf.means_[maxI])
+            print("  + Distance from the mean: {}".format(dist))
+
+    return person, confidence
+
+
+def save_unknown_user(src, dirname):
+    if not os.path.exists(dirname):
+        os.mkdir(dirname)
+
+    fileSeqNum = 1 + len(os.listdir(dirname))
+    faceFile = dirname + "/face_" + str(fileSeqNum) + ".jpg"
+
+    shutil.move(src, faceFile)
+
+
+def int_from_bytes(b3, b2, b1, b0):
+    return (((((b3 << 8) + b2) << 8) + b1) << 8) + b0
+
+
+def main():
+    if redis_ready is False:
+        print('REDIS not ready.')
         return
 
-    if len(reps) > 1:
-        print("List of faces in image from left to right")
+    rds.set('frame', '1')
 
-    for r in reps:
-        rep = r[1].reshape(1, -1)
-        frame = [frameNum]
-        data_list = rep.tolist()[0]
-        data_list = frame + data_list
-        bs = bytes()
-        bs = bs.join((struct.pack('f', val) for val in data_list))
+    cur_target_frame = -1
+    next_target_frame = 1
 
-        numSent = sock.send(bs)
-        print(str(frameNum) + ' frame face sent')
+    try:
+        for item in p.listen():
+            data = item
+
+            if data is not None:
+                data = data.get('data')
+
+                if data != 1L:
+                    temp = array.array('B', data)
+                    ar = np.array(temp, dtype=np.uint8)
+
+                    left = int_from_bytes(ar[4], ar[3], ar[2], ar[1])
+                    right = int_from_bytes(ar[8], ar[7], ar[6], ar[5])
+                    top = int_from_bytes(ar[12], ar[11], ar[10], ar[9])
+                    bottom = int_from_bytes(ar[16], ar[15], ar[14], ar[13])
+
+                    recv_frame = ar[0]
+
+                    ar = ar[17:]
+
+                    frame_str = rds.get('frame')
+
+                    print("recv frame: " + str(recv_frame) + ', x: ' + str(left) + ', y: ' + str(right) + ', t: ' + str(top) + ', b:' + str(bottom))
+
+                    if cur_target_frame is -1:
+                        cur_target_frame = recv_frame
+
+                    #print("current frame: " + str(cur_target_frame))
+                    #print("next frame: " + frame_str)
+
+                    next_target_frame = int(frame_str)
+
+                    if recv_frame == cur_target_frame:
+                        fileName = "/tmp/input.jpg"
+                        jpgFile = open(fileName, "wb")
+                        jpgFile.write(ar)
+                        jpgFile.close()
+
+                        person, confidence = infer(fileName)
+
+                        if confidence < 0.88:
+                            print("Who are you?: " + person)
+                            confidence = 0.0
+                            save_unknown_user(fileName, inputDir + '/Unknown')
+                            person = "Unknown"
+
+                        else: #confidence > 0.85:
+                            print("{} : {:.2f} %".format(person, 100 * confidence))
+
+                            if sock_ready is True:
+                                b_array = bytes()
+                                floatList = [left, right, top, bottom, confidence, label_list.index(person)]
+                                print("INDEX: " + str(label_list.index(person)))
+                                b_array = b_array.join((struct.pack('f', val) for val in floatList))
+                                sock.send(b_array)
+
+                    else:
+                        if recv_frame == next_target_frame:
+                            fileName = "/tmp/input.jpg"
+                            jpgFile = open(fileName, "wb")
+                            jpgFile.write(ar)
+                            jpgFile.close()
+
+                            person, confidence = infer(fileName)
+
+                            if confidence < 0.88:
+                                print("Who are you?: " + person)
+                                confidence = 0.0
+                                save_unknown_user(fileName, inputDir + '/Unknown')
+                                person = "Unknown"
+
+                            else:# confidence > 0.85:
+                                print("{} : {:.2f} %".format(person, 100 * confidence))
+
+                                if sock_ready is True:
+                                    b_array = bytes()
+                                    floatList = [left, right, top, bottom, confidence, label_list.index(person)]
+                                    print("INDEX: " + str(label_list.index(person)))
+                                    b_array = b_array.join((struct.pack('f', val) for val in floatList))
+                                    sock.send(b_array)
+
+                        else:
+                            cur_target_frame = next_target_frame
+    except:
+        print('Exit')
 
 
-def infer(img, db=False):
-    reps = getRep(img, False)
-
-    if not reps:
-        return 'uid_unknown',1.0
-
-    if len(reps) > 1:
-        print("List of faces in image from left to right")
-
-    for r in reps:
-        rep = r[1].reshape(1, -1)
-
-        if db:
-            print("Using DB Match")
-            user_name = ''
-            num_vector = 0
-            dist = 0
-
-            for key in rds.scan_iter(match='uid_*'):
-                cur_user = key[:len(key)-1]
-                val = rds.get(key)
-                val = extractVector(val)
-
-                if user_name == '':
-                    user_name = cur_user
-                    num_vector = 1
-                    dist = getL2Difference(val, rep)
-                elif user_name == cur_user:
-                    num_vector += 1
-                    dist += getL2Difference(val, rep)
-                else:
-                    #Calculate avg
-                    dist = dist / num_vector
-                    print(user_name, str(dist))
-                    user_name = cur_user
-                    num_vector = 1
-                    dist = getL2Difference(val, rep)
-
-            if num_vector == 0:
-                dist = 1.0
-            else:
-                dist = dist / num_vector
-
-            if (dist > 0.8):
-                user_name = 'uid_unknown'
-
-            print(user_name[4:], str(dist))
-
-            return user_name, dist
-
-        else:
-            bbx = r[0]
-            start = time.time()
-            predictions = clf.predict_proba(rep).ravel()
-            maxI = np.argmax(predictions)
-            person = le.inverse_transform(maxI)
-            confidence = predictions[maxI]
-            if args.verbose:
-                print("Prediction took {} seconds.".format(time.time() - start))
-            else:
-                print("{} : {:.2f} %".format(person, 100* confidence))
-            if isinstance(clf, GMM):
-                dist = np.linalg.norm(rep - clf.means_[maxI])
-                print("  + Distance from the mean: {}".format(dist))
-
-
-while True:
-    data = p.get_message()
-
-    if data is not None :
-        data = data.get('data')
-
-        if data != 1L:
-            temp = array.array('B', data)
-            ar = np.array(temp, dtype=np.uint8)
-
-            frameNum = ar[0]
-            ar = ar[1:]
-            #print frameNum
-            #print ar
-            fileName = "/tmp/input.jpg"
-            jpgFile = open(fileName, "wb");
-            jpgFile.write(ar)
-            jpgFile.close()
-
-            #inferAndSendRep(frameNum, fileName)
-            infer(fileName)
+if __name__ == "__main__":
+    main()

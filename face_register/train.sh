@@ -1,7 +1,8 @@
 #!/bin/bash
 
 echo Align face image..Wait
-rm -f output/aligned/cache*
+rm -rf output/* > /dev/null
+rm -rf input/Unknown > /dev/null
 ../openface/util/align-dlib.py input/ align outerEyesAndNose output/aligned/ --size 96
 
 echo Embedding aligned face image..Wait
