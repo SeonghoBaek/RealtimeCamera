@@ -39,6 +39,7 @@ int run_identifier() {
 
     pGVCF->startThread();
 
+    sleep(1);
 #if 0
     // Using REDIS
     //VectorSubscriber *vs = new VectorSubscriber("127.0.0.1", 6379, "vector");
@@ -49,6 +50,7 @@ int run_identifier() {
 
     vs->startThread();
 
+    sleep(1);
     //pLooper->wait(-1);
 
     return 0;

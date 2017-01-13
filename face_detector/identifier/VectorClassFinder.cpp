@@ -48,7 +48,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     {
         LOCK(this->mFrameLock)
         {
-            //LOGD("Lock enter\n");
+            LOGD("Lock enter\n");
 
             for (int i = 0; i < this->mNumLabel-1; i++)
             {
