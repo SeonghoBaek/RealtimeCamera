@@ -407,7 +407,6 @@ void run_yolo(int argc, char **argv)
     else if(0==strcmp(argv[2], "train")) train_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "valid")) validate_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_yolo_recall(cfg, weights);
-    else if(0==strcmp(argv[2], "camera")) detect_camera(cfg, weights, thresh, cam_index, filename, face_class, 1, frame_skip, prefix);
-    //else if(0==strcmp(argv[2], "demo")) demo(cfg, weights, thresh, cam_index, filename, face_class, 1, frame_skip, prefix);
+    else if(0==strcmp(argv[2], "camera")) run_camera(cfg, weights, thresh, cam_index, filename, face_class, 1);
     else if(0==strcmp(argv[2], "face")) face_yolo(cfg, weights, filename, thresh);
 }

@@ -16,6 +16,7 @@ import struct
 import dlib
 from sklearn.mixture import GMM
 
+threshold = 0.90
 
 label_list = ['ByongrakSeo', 'DaeyoungPark', 'HyungkiNoh', 'JangHyungLee', 'KiyoungKim', 'KwangheeLee', 'MinsamKo', 'SanghoonLee', 'SeonghoBaek', 'YonbeKim', 'Unknown']
 
@@ -279,13 +280,16 @@ def main():
 
                         person, confidence = infer(fileName)
 
-                        if confidence < 0.88:
-                            print("Who are you?: " + person)
-                            confidence = 0.0
-                            save_unknown_user(fileName, inputDir + '/Unknown')
-                            person = "Unknown"
+                        if confidence < threshold:
+                            print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
-                        else: #confidence > 0.85:
+                            if confidence < 0.8:
+                                save_unknown_user(fileName, inputDir + '/Unknown')
+
+                            person = "Unknown"
+                            confidence = 0.0
+
+                        else:
                             print("{} : {:.2f} %".format(person, 100 * confidence))
 
                             if sock_ready is True:
@@ -304,13 +308,16 @@ def main():
 
                             person, confidence = infer(fileName)
 
-                            if confidence < 0.88:
-                                print("Who are you?: " + person)
+                            if confidence < threshold:
+                                print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+
+                                if confidence < 0.8:
+                                    save_unknown_user(fileName, inputDir + '/Unknown')
+
                                 confidence = 0.0
-                                save_unknown_user(fileName, inputDir + '/Unknown')
                                 person = "Unknown"
 
-                            else:# confidence > 0.85:
+                            else:
                                 print("{} : {:.2f} %".format(person, 100 * confidence))
 
                                 if sock_ready is True:

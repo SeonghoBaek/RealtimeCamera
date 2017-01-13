@@ -30,6 +30,7 @@ public:
     int     mTop;
     int     mBottom;
     unsigned int mVersion;
+    float   mConfidence;
 
     Label()
     {
@@ -122,6 +123,7 @@ private:
     unsigned int mVersion;
 
     float       getDistance(int sx, int sy, int tx, int ty);
+    float       getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom);
 
 public:
     IMPLEMENT_THREAD(run());
@@ -142,6 +144,7 @@ public:
         DIR *pDp;
         struct dirent *pDirent;
         pDp = opendir(LABEL_DIRECTORY);
+        const char* unknown = "Unknown";
 
         if (pDp)
         {
@@ -152,7 +155,10 @@ public:
 
             while (pDirent = readdir(pDp))
             {
-                numLabels++;
+                if (strcmp(pDirent->d_name, unknown))
+                {
+                    numLabels++;
+                }
             }
 
             closedir(pDp);
@@ -173,8 +179,11 @@ public:
 
             while (pDirent = readdir(pDp))
             {
-                this->mpLabels[i].setLabel(pDirent->d_name);
-                i++;
+                if (strcmp(pDirent->d_name, unknown))
+                {
+                    this->mpLabels[i].setLabel(pDirent->d_name);
+                    i++;
+                }
             }
 
             closedir(pDp);
@@ -216,6 +225,16 @@ public:
     char* getClosestLabel(int center_x, int center_y);
 
     char* getClosestIoULabel(int left, int right, int top, int bottom);
+
+    void versionUp()
+    {
+        LOGD("Version Up: %d", this->mVersion);
+
+        LOCK(mFrameLock)
+        {
+            this->mVersion++;
+        }
+    }
 
     void run();
 };

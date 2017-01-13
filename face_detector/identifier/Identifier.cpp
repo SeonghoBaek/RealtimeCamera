@@ -56,7 +56,8 @@ int run_identifier() {
     return 0;
 }
 
-char *get_lable_in_box(int left, int top, int right, int bottom) {
+char *get_lable_in_box(int left, int top, int right, int bottom)
+{
     int center_x = -1;
     int center_y = -1;
 
@@ -65,6 +66,11 @@ char *get_lable_in_box(int left, int top, int right, int bottom) {
 
     //return pGVCF->getClosestLabel(center_x, center_y);
     return pGVCF->getClosestIoULabel(left, right, top, bottom);
+}
+
+void version_up()
+{
+    pGVCF->versionUp();
 }
 
 #ifdef __cplusplus

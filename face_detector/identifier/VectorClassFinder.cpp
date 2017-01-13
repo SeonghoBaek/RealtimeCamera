@@ -22,9 +22,26 @@ float VectorClassFinder::getDistance(int sx, int sy, int tx, int ty)
     return distance;
 }
 
+float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom)
+{
+    int l = MAX(left, sleft);
+    int r = MIN(right, sright);
+    int t = MIN(top, stop);
+    int b = MAX(bottom, sbottom);
+
+    if (r <= l) return 0.0;
+
+    int interArea = (r - l + 1) * (b - t + 1);
+    int boxAArea = (right - left + 1) * (bottom - top + 1);
+    int boxBArea = (sright - sleft + 1) * (sbottom - stop + 1);
+    float iou = (float)interArea / (float)(boxAArea + boxBArea - interArea);
+
+    return iou;
+}
+
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
 {
-    float IoU = 0.5;
+    float IoU = 0.65;
     int   index = -1;
 
     gResetTime++;
@@ -48,27 +65,21 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     {
         LOCK(this->mFrameLock)
         {
-            LOGD("Lock enter\n");
-
-            for (int i = 0; i < this->mNumLabel-1; i++)
+            for (int i = 0; i < this->mNumLabel; i++)
             {
                 if (this->mpLabels[i].getX() > 0)
                 {
-                    if (abs(this->mpLabels[i].mVersion - this->mVersion) > 10)
+                    if (abs(this->mpLabels[i].mVersion - this->mVersion) > 1)
                     {
+
                         this->mpLabels[i].setX(-1);
                         continue;
                     }
 
-                    int l = MAX(left, this->mpLabels[i].mLeft);
-                    int r = MIN(right, this->mpLabels[i].mRight);
-                    int t = MIN(top, this->mpLabels[i].mTop);
-                    int b = MAX(bottom, this->mpLabels[i].mBottom);
+                    float iou = this->getIoU(left, right, top, bottom,
+                                             this->mpLabels[i].mLeft,  this->mpLabels[i].mRight,  this->mpLabels[i].mTop,  this->mpLabels[i].mBottom);
 
-                    int interArea = (r - l + 1) * (b - t + 1);
-                    int boxAArea = (right - left + 1) * (bottom - top + 1);
-                    int boxBArea = (this->mpLabels[i].mRight - this->mpLabels[i].mLeft + 1) * (this->mpLabels[i].mBottom - this->mpLabels[i].mTop + 1);
-                    float iou = (float)interArea / (float)(boxAArea + boxBArea - interArea);
+                    LOGD("iou: %f", iou);
 
                     if (iou > IoU)
                     {
@@ -87,17 +98,8 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                 this->mpLabels[index].mTop = top;
                 this->mpLabels[index].mBottom = bottom;
 
-                this->mVersion++;
-                this->mpLabels[index].mVersion++;
+                this->mpLabels[index].mVersion = this->mVersion;
             }
-            else
-            {
-                for (int i = 0; i < this->mNumLabel-1; i++)
-                {
-                    this->mpLabels[i].setX(-1);
-                }
-            }
-
         }
     }
 
@@ -133,7 +135,7 @@ char* VectorClassFinder::getClosestLabel(int center_x, int center_y)
     {
         LOCK(this->mFrameLock)
         {
-            for (int i = 0; i < this->mNumLabel-1; i++)
+            for (int i = 0; i < this->mNumLabel; i++)
             {
                 if (this->mpLabels[i].getX() > 0) {
                     float dist = getDistance(this->mpLabels[i].getX(), this->mpLabels[i].getY(), center_x, center_y);
@@ -211,14 +213,54 @@ int VectorClassFinder::looperCallback(const char *event) {
 
     LOCK(this->mFrameLock)
     {
-        if (this->mpLabels[pV->mLabelIndex].getX() == -1)
+        if (this->mpLabels[pV->mLabelIndex].getX() != -1)
         {
-            this->mpLabels[pV->mLabelIndex].setX(pV->mX);
-            this->mpLabels[pV->mLabelIndex].setY(pV->mY);
-            this->mpLabels[pV->mLabelIndex].mLeft = pV->mX;
-            this->mpLabels[pV->mLabelIndex].mRight = pV->mY;
-            this->mpLabels[pV->mLabelIndex].mTop = pV->mT;
-            this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
+            float iou = this->getIoU(pV->mX, pV->mY, pV->mT, pV->mB,
+                                     this->mpLabels[pV->mLabelIndex].mLeft, this->mpLabels[pV->mLabelIndex].mRight,
+                                     this->mpLabels[pV->mLabelIndex].mTop, this->mpLabels[pV->mLabelIndex].mBottom);
+
+            LOGD("updated iou: %f",iou);
+
+            if (iou > 0.65)
+            {
+                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+            }
+            else
+            {
+                this->mpLabels[pV->mLabelIndex].setX(-1); // Give a more try
+            }
+        }
+        else
+        {
+            bool tryNext = FALSE;
+
+            for (int i = 0; i < this->mNumLabel; i++)
+            {
+                if (this->mpLabels[i].getX() > 0)
+                {
+                    float iou = this->getIoU(pV->mX, pV->mY, pV->mT, pV->mB,
+                                             this->mpLabels[pV->mLabelIndex].mLeft, this->mpLabels[pV->mLabelIndex].mRight,
+                                             this->mpLabels[pV->mLabelIndex].mTop, this->mpLabels[pV->mLabelIndex].mBottom);
+
+                    if (iou > 0.5)
+                    {
+                        this->mpLabels[i].setX(-1); // Give a more try;
+                        tryNext = TRUE;
+                    }
+                }
+            }
+
+            if (tryNext == FALSE)
+            {
+                this->mpLabels[pV->mLabelIndex].setX(pV->mX);
+                this->mpLabels[pV->mLabelIndex].setY(pV->mY);
+                this->mpLabels[pV->mLabelIndex].mLeft = pV->mX;
+                this->mpLabels[pV->mLabelIndex].mRight = pV->mY;
+                this->mpLabels[pV->mLabelIndex].mTop = pV->mT;
+                this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
+                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+            }
         }
     }
 

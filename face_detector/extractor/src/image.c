@@ -206,6 +206,10 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
     redisReply *pReply = NULL;
 
+    version_up();
+
+    if (num == 0) return;
+
     image original_image = copy_image(im);
 
     gUploadStep++;
@@ -260,25 +264,25 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             int center_y = (top + bot) / 2;
             int padding = (right - left) / 10; // 10 % width.
 
-            printf("center: %d, %d\n", center_x, center_y);
+            //printf("center: %d, %d\n", center_x, center_y);
 
             // Extend
-            left -= padding;
-            right += padding;
-            top -= padding;
-            bot += padding;
+            int padded_left = left - padding;
+            int padded_right = right + padding;
+            int padded_top = top - padding;
+            int padded_bot = bot + padding;
 
 
-            if (left < 0) left = 0;
-            if (right > im.w - 1) right = im.w - 1;
-            if (top < 0) top = 0;
-            if (bot > im.h - 1) bot = im.h - 1;
+            if (padded_left < 0) padded_left = 0;
+            if (padded_right > im.w - 1) padded_right = im.w - 1;
+            if (padded_top < 0) padded_top = 0;
+            if (padded_bot > im.h - 1) padded_bot = im.h - 1;
 
             // Save face box image. Added by Seongho Baek 2016.12.20
             memset(filename, 0, 80);
             sprintf(filename, "/tmp/face_%d", n++);
 
-            image box_image = crop_image(original_image, left, top, right - left, bot - top);
+            image box_image = crop_image(original_image, padded_left, padded_top, padded_right - padded_left, padded_bot - padded_top);
 
             if (gUploadStep == 0)
             {
@@ -308,30 +312,19 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
                 payload = (unsigned char *) malloc(length + 18);
 
-                printf("make payload\n");
+                //printf("make payload\n");
                 payload[0] = (unsigned char)gFrameSeq;
-                memcpy(&payload[1],(unsigned char*)&left, sizeof(int));
-                memcpy(&payload[5],(unsigned char*)&right, sizeof(int));
-                memcpy(&payload[9],(unsigned char*)&top, sizeof(int));
-                memcpy(&payload[13],(unsigned char*)&bot, sizeof(int));
+                memcpy(&payload[1],(unsigned char*)&padded_left, sizeof(int));
+                memcpy(&payload[5],(unsigned char*)&padded_right, sizeof(int));
+                memcpy(&payload[9],(unsigned char*)&padded_top, sizeof(int));
+                memcpy(&payload[13],(unsigned char*)&padded_bot, sizeof(int));
 
-                /*
-                payload[1] = *((unsigned char*)&center_x);
-                payload[2] = *((unsigned char*)&center_x + 1);
-                payload[3] = *((unsigned char*)&center_x + 2);
-                payload[4] = *((unsigned char*)&center_x + 3);
-                //printf("center x bytes: %d %d %d %d\n", payload[1], payload[2], payload[3], payload[4]);
-                payload[5] = *((unsigned char*)&center_y);
-                payload[6] = *((unsigned char*)&center_y + 1);
-                payload[7] = *((unsigned char*)&center_y + 2);
-                payload[8] = *((unsigned char*)&center_y + 3);
-                */
 
                 fread(&payload[17], 1, length, p_img_file);
 
                 if (pRC)
                 {
-                    printf("publish payload\n");
+                    //printf("publish payload\n");
                     redisCommand(pRC, "PUBLISH %s %b", "camera", payload, length + 17);
                 }
 
@@ -339,34 +332,21 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
                 fclose(p_img_file);
 
-                printf("free box image\n");
+                //printf("free box image\n");
                 free_image(box_image);
             }
 
-            // restore
-            /*
-            left += padding;
-            right -= padding;
-            top += padding;
-            bot -= padding;
-
-            if (left < 0) left = 0;
-            if (right > im.w - 1) right = im.w - 1;
-            if (top < 0) top = 0;
-            if (bot > im.h - 1) bot = im.h - 1;
-            */
-
-            draw_box_width(im, left, top, right, bot, width, red, green, blue);
+            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, red, green, blue);
 
             if (alphabet)
             {
-                printf("get label\n");
+                //printf("get label\n");
                 strlabel = get_lable_in_box(left, top, right, bot);
 
-                printf("draw label\n");
+                //printf("draw label\n");
                 image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
-                draw_label(im, top + width, left, label, rgb);
 
+                draw_label(im, padded_top + width, padded_left, label, rgb);
             }
         }
 
