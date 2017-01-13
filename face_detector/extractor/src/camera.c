@@ -260,6 +260,7 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
             if(pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
             if(pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
+            /*
             if(!prefix)
             {
                 show_image(disp, "Camera");
@@ -285,6 +286,7 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
                 sprintf(buff, "%s_%08d", prefix, count);
                 save_image(disp, buff);
             }
+            */
 
             pthread_join(fetch_thread, 0);
             pthread_join(detect_thread, 0);
