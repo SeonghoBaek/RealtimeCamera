@@ -17,6 +17,7 @@ darknet
 CMakeLists.txt
 cmake-build-debug/
 .idea/
+.*.un~
 
 # OS Generated #
 .DS_Store*
