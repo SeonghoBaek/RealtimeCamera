@@ -37,10 +37,10 @@ public:
         strcpy(mLabelString, "Unknown");
         mCenterX = -1;
         mCenterY = -1;
-        mLeft = -1;
-        mRight = -1;
-        mTop  = -1;
-        mBottom = -1;
+        mLeft = 0;
+        mRight = 0;
+        mTop  = 0;
+        mBottom = 0;
         mVersion = 0;
     }
 
@@ -228,7 +228,7 @@ public:
 
     void versionUp()
     {
-        LOGD("Version Up: %d", this->mVersion);
+        //LOGD("Version Up: %d", this->mVersion);
 
         LOCK(mFrameLock)
         {

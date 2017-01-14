@@ -26,8 +26,8 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
 {
     int l = MAX(left, sleft);
     int r = MIN(right, sright);
-    int t = MIN(top, stop);
-    int b = MAX(bottom, sbottom);
+    int t = MAX(top, stop);
+    int b = MIN(bottom, sbottom);
 
     if (r <= l) return 0.0;
 
@@ -36,18 +36,26 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
     int boxBArea = (sright - sleft + 1) * (sbottom - stop + 1);
     float iou = (float)interArea / (float)(boxAArea + boxBArea - interArea);
 
+    if (iou >= 1)
+    {
+        LOGD("sl: %d, sr: %d, st: %d, sb: %d", sleft, sright, stop, sbottom);
+        LOGD("tl: %d, tr: %d, tt: %d, tb: %d", left, right, top, bottom);
+        LOGD("l: %d, r: %d, t: %d, b: %d", l, r, t, b);
+        LOGD("boxA: %d, boxB: %d, Inter: %d", boxAArea, boxBArea, interArea);
+    }
+
     return iou;
 }
 
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
 {
-    float IoU = 0.65;
+    float IoU = 0.5;
     int   index = -1;
 
-    gResetTime++;
-    gResetTime %= RESET_FREQ;
+    //gResetTime++;
+    //gResetTime %= RESET_FREQ;
 
-    LOGD("Check IOU");
+    //LOGD("Check IOU");
 
     /*
     if (gResetTime == 0)
@@ -79,7 +87,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     float iou = this->getIoU(left, right, top, bottom,
                                              this->mpLabels[i].mLeft,  this->mpLabels[i].mRight,  this->mpLabels[i].mTop,  this->mpLabels[i].mBottom);
 
-                    LOGD("iou: %f", iou);
+                    //LOGD("iou: %f", iou);
 
                     if (iou > IoU)
                     {
@@ -103,7 +111,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
         }
     }
 
-    LOGD("index = %d", index);
+    //LOGD("index = %d", index);
 
     if (index == -1) return "";
 
@@ -219,9 +227,9 @@ int VectorClassFinder::looperCallback(const char *event) {
                                      this->mpLabels[pV->mLabelIndex].mLeft, this->mpLabels[pV->mLabelIndex].mRight,
                                      this->mpLabels[pV->mLabelIndex].mTop, this->mpLabels[pV->mLabelIndex].mBottom);
 
-            LOGD("updated iou: %f",iou);
+            //LOGD("updated iou: %f",iou);
 
-            if (iou > 0.65)
+            if (iou > 0.5)
             {
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
             }
@@ -244,7 +252,11 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                     if (iou > 0.5)
                     {
-                        this->mpLabels[i].setX(-1); // Give a more try;
+                        if (this->mpLabels[i].mConfidence < pV->mConfidence)
+                        {
+                            this->mpLabels[i].setX(-1); // Give a more try;
+                        }
+
                         tryNext = TRUE;
                     }
                 }
