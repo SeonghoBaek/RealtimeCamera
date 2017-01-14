@@ -188,7 +188,7 @@ def infer(fileName):
     confidence = 0.0
 
     if not reps:
-        print("Who are you?")
+        #print("Who are you?")
         return 'Unknown', confidence
 
     if len(reps) > 1:
@@ -262,7 +262,7 @@ def main():
 
                     frame_str = rds.get('frame')
 
-                    print("recv frame: " + str(recv_frame) + ', x: ' + str(left) + ', y: ' + str(right) + ', t: ' + str(top) + ', b:' + str(bottom))
+                    #print("recv frame: " + str(recv_frame) + ', x: ' + str(left) + ', y: ' + str(right) + ', t: ' + str(top) + ', b:' + str(bottom))
 
                     if cur_target_frame is -1:
                         cur_target_frame = recv_frame
@@ -281,7 +281,7 @@ def main():
                         person, confidence = infer(fileName)
 
                         if confidence < threshold:
-                            print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                            #print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                             if confidence < 0.8:
                                 save_unknown_user(fileName, inputDir + '/Unknown')
@@ -290,12 +290,12 @@ def main():
                             confidence = 0.0
 
                         else:
-                            print("{} : {:.2f} %".format(person, 100 * confidence))
+                            #print("{} : {:.2f} %".format(person, 100 * confidence))
 
                             if sock_ready is True:
                                 b_array = bytes()
                                 floatList = [left, right, top, bottom, confidence, label_list.index(person)]
-                                print("INDEX: " + str(label_list.index(person)))
+                                #print("INDEX: " + str(label_list.index(person)))
                                 b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                 sock.send(b_array)
 
@@ -309,7 +309,7 @@ def main():
                             person, confidence = infer(fileName)
 
                             if confidence < threshold:
-                                print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                                #print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                                 if confidence < 0.8:
                                     save_unknown_user(fileName, inputDir + '/Unknown')
@@ -318,12 +318,12 @@ def main():
                                 person = "Unknown"
 
                             else:
-                                print("{} : {:.2f} %".format(person, 100 * confidence))
+                                #print("{} : {:.2f} %".format(person, 100 * confidence))
 
                                 if sock_ready is True:
                                     b_array = bytes()
                                     floatList = [left, right, top, bottom, confidence, label_list.index(person)]
-                                    print("INDEX: " + str(label_list.index(person)))
+                                    #print("INDEX: " + str(label_list.index(person)))
                                     b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                     sock.send(b_array)
 

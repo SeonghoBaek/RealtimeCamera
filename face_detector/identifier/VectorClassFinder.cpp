@@ -36,6 +36,7 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
     int boxBArea = (sright - sleft + 1) * (sbottom - stop + 1);
     float iou = (float)interArea / (float)(boxAArea + boxBArea - interArea);
 
+	/*
     if (iou >= 1)
     {
         LOGD("sl: %d, sr: %d, st: %d, sb: %d", sleft, sright, stop, sbottom);
@@ -43,6 +44,7 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
         LOGD("l: %d, r: %d, t: %d, b: %d", l, r, t, b);
         LOGD("boxA: %d, boxB: %d, Inter: %d", boxAArea, boxBArea, interArea);
     }
+	*/
 
     return iou;
 }
