@@ -196,6 +196,7 @@ image **load_alphabet()
 char*   strlabel = NULL;
 int     gUploadStep = 0;
 int     gFrameSeq = 0;
+float   gBoxRGB[] = {0.95, 0.95, 0.95};
 
 void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
 {
@@ -241,18 +242,6 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 alphabet = 0;
             }
 
-            //printf("%s: %.0f%%\n", names[class], prob * 100);
-            int offset = class * 123457 % classes;
-            float red = get_color(2, offset, classes);
-            float green = get_color(1, offset, classes);
-            float blue = get_color(0, offset, classes);
-            float rgb[3];
-
-            //width = prob*20+2;
-
-            rgb[0] = red;
-            rgb[1] = green;
-            rgb[2] = blue;
             box b = boxes[i];
 
             int left = (b.x - b.w / 2.) * im.w;
@@ -260,8 +249,8 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             int top = (b.y - b.h / 2.) * im.h;
             int bot = (b.y + b.h / 2.) * im.h;
 
-            int center_x = (left + right) / 2;
-            int center_y = (top + bot) / 2;
+            //int center_x = (left + right) / 2;
+            //int center_y = (top + bot) / 2;
             int padding = (right - left) / 10; // 10 % width.
 
             //printf("center: %d, %d\n", center_x, center_y);
@@ -336,7 +325,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 free_image(box_image);
             }
 
-            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, red, green, blue);
+            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, gBoxRGB[0], gBoxRGB[1], gBoxRGB[2]);
 
             if (alphabet)
             {
@@ -346,7 +335,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 //printf("draw label\n");
                 image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
 
-                draw_label(im, padded_top + width, padded_left, label, rgb);
+                draw_label(im, padded_top + width, padded_left, label, gBoxRGB);
             }
         }
 
