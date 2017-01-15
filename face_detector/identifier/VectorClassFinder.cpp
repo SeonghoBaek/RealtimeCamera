@@ -59,6 +59,19 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
     //LOGD("Check IOU");
 
+    struct timeval time;
+
+    double  cur;
+
+    if (gettimeofday(&time,NULL))
+    {
+        cur =  0;
+    }
+    else
+    {
+        cur = (double) time.tv_sec;
+    }
+
     /*
     if (gResetTime == 0)
     {
@@ -93,6 +106,13 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
                     if (iou > IoU)
                     {
+                        if (cur - this->mpLabels[i].mUpdateTime > 3.0)
+                        {
+                            LOGD("diff: %f", (float)(cur - this->mpLabels[i].mUpdateTime));
+                            this->mpLabels[i].setX(-1);
+                            continue;
+                        }
+
                         index = i;
                         IoU = iou;
                     }
@@ -221,6 +241,18 @@ int VectorClassFinder::looperCallback(const char *event) {
 
     //LOGD("ID: %d, X: %d, Y: %d, C: %f", pV->mLabelIndex, pV->mX, pV->mY, pV->mConfidence);
 
+    struct timeval time;
+    double  cur;
+
+    if (gettimeofday(&time,NULL))
+    {
+        cur =  0;
+    }
+    else
+    {
+        cur = (double) time.tv_sec;
+    }
+
     LOCK(this->mFrameLock)
     {
         if (this->mpLabels[pV->mLabelIndex].getX() != -1)
@@ -234,6 +266,7 @@ int VectorClassFinder::looperCallback(const char *event) {
             if (iou > 0.5)
             {
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
             }
             else
             {
@@ -274,6 +307,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                 this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
                 this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
             }
         }
     }

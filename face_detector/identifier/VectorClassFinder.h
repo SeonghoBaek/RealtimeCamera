@@ -31,6 +31,7 @@ public:
     int     mBottom;
     unsigned int mVersion;
     float   mConfidence;
+    double  mUpdateTime;
 
     Label()
     {
@@ -42,6 +43,7 @@ public:
         mTop  = 0;
         mBottom = 0;
         mVersion = 0;
+        mUpdateTime = 0;
     }
 
     void setX(int x)
