@@ -127,7 +127,7 @@ double get_wall_time()
 void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes)
 {
     image **alphabet = load_alphabet();
-    int delay = 31;
+    int delay = 1;
 
     const char *hostname = "127.0.0.1";
     int port = 6379;
@@ -234,14 +234,9 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
         if (c == 10)
         {
-            if (delay == 0) delay = 31;
-            else
-            {
-                delay -= 10;
+            delay += 10;
 
-                if (delay < 0) delay = 0;
-                else if (delay == 0) delay = 31;
-            }
+            if (delay > 40) delay = 1;
         }
 
         pthread_join(fetch_thread, 0);
