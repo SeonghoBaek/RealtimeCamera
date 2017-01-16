@@ -16,9 +16,7 @@ import struct
 import dlib
 from sklearn.mixture import GMM
 
-threshold = 0.90
-
-label_list = ['ByongrakSeo', 'DaeyoungPark', 'HyungkiNoh', 'JangHyungLee', 'KiyoungKim', 'KwangheeLee', 'MinsamKo', 'SanghoonLee', 'SeonghoBaek', 'YonbeKim', 'Unknown']
+threshold = 0.85
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
@@ -28,6 +26,9 @@ inputDir = baseDir + 'face_register/input'
 dlibModelDir = os.path.join(modelDir, 'dlib')
 openfaceModelDir = os.path.join(modelDir, 'openface')
 haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
+
+label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
+print(label_list)
 
 HOST, PORT = "127.0.0.1", 55555
 
@@ -84,7 +85,7 @@ def getRep(imgPath, multiple=False):
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
 
-    #rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
+    rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
 
     if show_time is True:
         print("Loading the image took {} seconds.".format(time.time() - start))
@@ -281,7 +282,7 @@ def main():
                         person, confidence = infer(fileName)
 
                         if confidence < threshold:
-                            #print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                            print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                             if confidence < 0.8:
                                 save_unknown_user(fileName, inputDir + '/Unknown')
@@ -309,7 +310,7 @@ def main():
                             person, confidence = infer(fileName)
 
                             if confidence < threshold:
-                                #print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                                print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                                 if confidence < 0.8:
                                     save_unknown_user(fileName, inputDir + '/Unknown')
@@ -335,3 +336,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
