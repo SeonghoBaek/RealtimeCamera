@@ -6,7 +6,8 @@
 #include "box.h"
 #include "camera.h"
 #include "image.h"
-
+#include <dirent.h>
+#include <sys/stat.h>
 #ifdef OPENCV
 #include "opencv2/highgui/highgui_c.h"
 #endif
@@ -335,8 +336,14 @@ void test_yolo(char *cfgfile, char *weightfile, char *filename, float thresh)
     }
 }
 
-void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh)
+void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh, int dirmode)
 {
+    DIR *pDp;
+    struct dirent *pDirent;
+    const char* unknown = "Unknown";
+    struct stat statbuf;
+    char temp[80];
+
     image **alphabet = load_alphabet();
     network net = parse_network_cfg(cfgfile);
     if(weightfile){
@@ -353,6 +360,56 @@ void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh)
     box *boxes = calloc(l.side*l.side*l.n, sizeof(box));
     float **probs = calloc(l.side*l.side*l.n, sizeof(float *));
     for(j = 0; j < l.side*l.side*l.n; ++j) probs[j] = calloc(l.classes, sizeof(float *));
+
+
+    if (dirmode == 1)
+    {
+        printf("Enter Image Dir Path: ");
+        fflush(stdout);
+        input = fgets(input, 256, stdin);
+        if(!input) return;
+        strtok(input, "\n");
+
+        pDp = opendir(input);
+
+        if (pDp)
+        {
+            int numLabels = 0;
+
+            readdir(pDp); // .
+            readdir(pDp); // ..
+
+            while (pDirent = readdir(pDp))
+            {
+                sprintf(temp, "%s/%s", input, pDirent->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISREG(statbuf.st_mode))
+                {
+                    image im = load_image_color(temp,0,0);
+                    image sized = resize_image(im, net.w, net.h);
+                    float *X = sized.data;
+                    time=clock();
+                    network_predict(net, X);
+                    printf("%s: Predicted in %f seconds.\n", input, sec(clock()-time));
+                    get_detection_boxes(l, 1, 1, thresh, probs, boxes, 0);
+                    if (nms) do_nms_sort(boxes, probs, l.side*l.side*l.n, l.classes, nms);
+                    //draw_detections(im, l.side*l.side*l.n, thresh, boxes, probs, voc_names, alphabet, 20);
+                    draw_and_save_detections(im, l.side*l.side*l.n, thresh, boxes, probs, face_class, alphabet, 1);
+                    //save_image(im, "predictions");
+                    //show_image(im, "predictions");
+
+                    free_image(im);
+                    free_image(sized);
+                }
+            }
+
+            closedir(pDp);
+        }
+
+        return;
+    }
+
     while(1){
         if(filename){
             strncpy(input, filename, 256);
@@ -408,5 +465,5 @@ void run_yolo(int argc, char **argv)
     else if(0==strcmp(argv[2], "valid")) validate_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_yolo_recall(cfg, weights);
     else if(0==strcmp(argv[2], "camera")) run_camera(cfg, weights, thresh, cam_index, filename, face_class, 1);
-    else if(0==strcmp(argv[2], "face")) face_yolo(cfg, weights, filename, thresh);
+    else if(0==strcmp(argv[2], "face")) face_yolo(cfg, weights, filename, thresh, 1);
 }

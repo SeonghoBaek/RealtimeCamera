@@ -345,6 +345,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     free_image(original_image);
 }
 #endif
+int g_pic_seq = 0;
 
 void draw_and_save_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
 {
@@ -385,21 +386,32 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
             int top   = (b.y-b.h/2.)*im.h;
             int bot   = (b.y+b.h/2.)*im.h;
 
-            if(left < 0) left = 0;
-            if(right > im.w-1) right = im.w-1;
-            if(top < 0) top = 0;
-            if(bot > im.h-1) bot = im.h-1;
+            int padding = (right - left) / 10; // 10 % width.
+
+            //printf("center: %d, %d\n", center_x, center_y);
+
+            // Extend
+            int padded_left = left - padding;
+            int padded_right = right + padding;
+            int padded_top = top - padding;
+            int padded_bot = bot + padding;
+
+
+            if (padded_left < 0) padded_left = 0;
+            if (padded_right > im.w - 1) padded_right = im.w - 1;
+            if (padded_top < 0) padded_top = 0;
+            if (padded_bot > im.h - 1) padded_bot = im.h - 1;
 
             // Save face box image. Added by Seongho Baek 2016.12.20
             memset(filename, 0, 80);
-            sprintf(filename, "face_%d", n++);
+            sprintf(filename, "/home/major/Temp/face_%d", g_pic_seq++);
 
-            image box_image = crop_image(original_image, left, top, right-left,bot-top);
+            image box_image = crop_image(original_image, padded_left, padded_top, padded_right-padded_left,padded_bot-padded_top);
 
             save_image(box_image, filename);
             free_image(box_image);
 
-            draw_box_width(im, left, top, right, bot, width, red, green, blue);
+            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, red, green, blue);
 
             //image crop_image(image im, int dx, int dy, int w, int h);
             if (alphabet) {
