@@ -16,7 +16,7 @@ import struct
 import dlib
 from sklearn.mixture import GMM
 
-threshold = 0.85
+threshold = 0.80
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
@@ -46,7 +46,7 @@ parser.add_argument('--verbose', action='store_true')
 args = parser.parse_args()
 
 align = openface.AlignDlib(args.dlibFacePredictor)
-net = openface.TorchNeuralNet(args.networkModel, args.imgDim)
+net = openface.TorchNeuralNet(args.networkModel, imgDim=args.imgDim, cuda=True)
 
 redis_ready = False
 
