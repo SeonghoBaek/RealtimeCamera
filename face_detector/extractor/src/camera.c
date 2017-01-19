@@ -41,7 +41,6 @@ static image disp = {0};
 static CvCapture * cap;
 static float fps = 0;
 static float camera_thresh = 0;
-
 static float *predictions[FRAMES];
 static int camera_index = 0;
 static image images[FRAMES];
@@ -76,6 +75,7 @@ void *detect_in_thread(void *ptr)
     layer l;
     float *X;
     float *prediction;
+    int num_bbox = 0;
 
     l = net.layers[net.n-1];
     X = det_s.data;
@@ -93,6 +93,7 @@ void *detect_in_thread(void *ptr)
     } else {
         error("Last layer must produce detections\n");
     }
+
     if (nms > 0) do_nms(boxes, probs, l.w*l.h*l.n, l.classes, nms);
 
     //printf("\033[2J");
@@ -101,15 +102,19 @@ void *detect_in_thread(void *ptr)
     //printf("\nFPS:%.1f\n",fps);
     //printf("Objects:\n\n");
 
+    num_bbox = l.w*l.h*l.n;
+
     images[camera_index] = det;
     det = images[(camera_index + FRAMES/2 + 1)%FRAMES];
     camera_index = (camera_index + 1)%FRAMES;
 
+    //printf("num bbox: %d\n", num_bbox);
+
 #ifdef REDIS
-    draw_and_send_detections(gRedisContext, det, l.w*l.h*l.n, camera_thresh, boxes, probs, camera_names, camera_alphabet, gFrameNum);
+    draw_and_send_detections(gRedisContext, det, num_bbox, camera_thresh, boxes, probs, camera_names, camera_alphabet, gFrameNum);
 
 #else
-    draw_detections(det, l.w*l.h*l.n, camera_thresh, boxes, probs, camera_names, camera_alphabet, camera_classes);
+    draw_detections(det, num_bbox, camera_thresh, boxes, probs, camera_names, camera_alphabet, camera_classes);
 #endif
 
     return 0;
@@ -219,7 +224,7 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
     cvNamedWindow("Camera", CV_WINDOW_NORMAL);
     cvMoveWindow("Camera", 0, 0);
-    cvResizeWindow("Camera", 1024, 768); // 1352 , 1013
+    cvResizeWindow("Camera", 1200, 900); // 1352 , 1013
 
     while (1) {
         gFrameNum++;
@@ -232,6 +237,9 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
         int c = cvWaitKey(delay);
 
+        pthread_join(fetch_thread, 0);
+        pthread_join(detect_thread, 0);
+
         if (c == 10)
         {
             delay += 10;
@@ -239,8 +247,6 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
             if (delay > 40) delay = 1;
         }
 
-        pthread_join(fetch_thread, 0);
-        pthread_join(detect_thread, 0);
 
         free_image(disp);
         disp = det;

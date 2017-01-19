@@ -32,6 +32,7 @@ public:
     unsigned int mVersion;
     float   mConfidence;
     double  mUpdateTime;
+    int     mChecked;
 
     Label()
     {
@@ -44,6 +45,7 @@ public:
         mBottom = 0;
         mVersion = 0;
         mUpdateTime = 0;
+        mChecked = 0;
     }
 
     void setX(int x)
@@ -147,6 +149,8 @@ public:
         struct dirent *pDirent;
         pDp = opendir(LABEL_DIRECTORY);
         const char* unknown = "Unknown";
+        struct stat statbuf;
+        char temp[80];
 
         if (pDp)
         {
@@ -155,11 +159,17 @@ public:
             readdir(pDp); // .
             readdir(pDp); // ..
 
+
             while (pDirent = readdir(pDp))
             {
-                if (strcmp(pDirent->d_name, unknown))
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
                 {
-                    numLabels++;
+                    if (strcmp(pDirent->d_name, unknown)) {
+                        numLabels++;
+                    }
                 }
             }
 
@@ -181,10 +191,15 @@ public:
 
             while (pDirent = readdir(pDp))
             {
-                if (strcmp(pDirent->d_name, unknown))
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
                 {
-                    this->mpLabels[i].setLabel(pDirent->d_name);
-                    i++;
+                    if (strcmp(pDirent->d_name, unknown)) {
+                        this->mpLabels[i].setLabel(pDirent->d_name);
+                        i++;
+                    }
                 }
             }
 
@@ -227,6 +242,8 @@ public:
     char* getClosestLabel(int center_x, int center_y);
 
     char* getClosestIoULabel(int left, int right, int top, int bottom);
+
+    void resetLabelCheck();
 
     void versionUp()
     {

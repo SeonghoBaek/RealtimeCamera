@@ -7,6 +7,7 @@
 #include <math.h>
 
 #define RESET_FREQ 60
+#define USE_UPDATE_CHECK 0
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -30,6 +31,7 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
     int b = MIN(bottom, sbottom);
 
     if (r <= l) return 0.0;
+    if (b <= t) return 0.0;
 
     int interArea = (r - l + 1) * (b - t + 1);
     int boxAArea = (right - left + 1) * (bottom - top + 1);
@@ -49,9 +51,20 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
     return iou;
 }
 
+void VectorClassFinder::resetLabelCheck()
+{
+    LOCK(this->mFrameLock)
+    {
+        for (int i = 0; i < this->mNumLabel; i++)
+        {
+            this->mpLabels[i].mChecked = 0;
+        }
+    }
+}
+
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
 {
-    float IoU = 0.5;
+    float IoU = 0.4;
     int   index = -1;
 
     //gResetTime++;
@@ -59,6 +72,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
     //LOGD("Check IOU");
 
+#if (USE_UPDATE_CHECK == 1)
     struct timeval time;
 
     double  cur;
@@ -71,6 +85,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     {
         cur = (double) time.tv_sec;
     }
+#endif
 
     /*
     if (gResetTime == 0)
@@ -90,12 +105,15 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
         {
             for (int i = 0; i < this->mNumLabel; i++)
             {
-                if (this->mpLabels[i].getX() > 0)
+                //LOGD("X: %d, checked: %d", this->mpLabels[i].getX(), this->mpLabels[i].mChecked);
+                if (this->mpLabels[i].getX() > 0 && this->mpLabels[i].mChecked == 0)
                 {
-                    if (abs(this->mpLabels[i].mVersion - this->mVersion) > 1)
+
+                    if (abs(this->mpLabels[i].mVersion - this->mVersion) > 15)
                     {
 
                         this->mpLabels[i].setX(-1);
+                        LOGD("Version diff: Disappeared? %s", this->mpLabels[i].getLabel());
                         continue;
                     }
 
@@ -104,22 +122,22 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
                     //LOGD("iou: %f", iou);
 
-                    if (iou > IoU)
+                    if (iou >= IoU)
                     {
-                        if (cur - this->mpLabels[i].mUpdateTime > 3.0)
+#if (USE_UPDATE_CHECK == 1)
+                        if (cur - this->mpLabels[i].mUpdateTime > 4.0)
                         {
-                            LOGD("diff: %f", (float)(cur - this->mpLabels[i].mUpdateTime));
+                            LOGD("diff: %f for %s", (float)(cur - this->mpLabels[i].mUpdateTime), this->mpLabels[i].getLabel());
                             this->mpLabels[i].setX(-1);
                             continue;
                         }
-
+#endif
                         index = i;
                         IoU = iou;
+                        break;
                     }
                 }
             }
-
-            //LOGD("for exit");
 
             if (index != -1)
             {
@@ -129,6 +147,9 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                 this->mpLabels[index].mBottom = bottom;
 
                 this->mpLabels[index].mVersion = this->mVersion;
+                this->mpLabels[index].mChecked = 1;
+
+                //LOGD("OK Still %s", this->mpLabels[index].getLabel());
             }
         }
     }
@@ -241,6 +262,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 
     //LOGD("ID: %d, X: %d, Y: %d, C: %f", pV->mLabelIndex, pV->mX, pV->mY, pV->mConfidence);
 
+#if (USE_UPDATE_CHECK == 1)
     struct timeval time;
     double  cur;
 
@@ -252,62 +274,86 @@ int VectorClassFinder::looperCallback(const char *event) {
     {
         cur = (double) time.tv_sec;
     }
+#endif
 
     LOCK(this->mFrameLock)
     {
         if (this->mpLabels[pV->mLabelIndex].getX() != -1)
         {
+#if 1
+            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+#if (USE_UPDATE_CHECK == 1)
+            this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
+#else
             float iou = this->getIoU(pV->mX, pV->mY, pV->mT, pV->mB,
                                      this->mpLabels[pV->mLabelIndex].mLeft, this->mpLabels[pV->mLabelIndex].mRight,
                                      this->mpLabels[pV->mLabelIndex].mTop, this->mpLabels[pV->mLabelIndex].mBottom);
 
-            //LOGD("updated iou: %f",iou);
-
-            if (iou > 0.5)
+            if (iou > 0.3)
             {
+                //LOGD("Still same person: %d, %f", pV->mLabelIndex, iou);
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+#if (USE_UPDATE_CHECK == 1)
                 this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
             }
             else
             {
+                LOGD("Reset Index: %s, %f", this->mpLabels[pV->mLabelIndex].getLabel(), iou);
                 this->mpLabels[pV->mLabelIndex].setX(-1); // Give a more try
             }
+#endif
         }
         else
         {
             bool tryNext = FALSE;
 
-            for (int i = 0; i < this->mNumLabel; i++)
+            LOGD("New : %s, Confidence: %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
+
+            //if (pV->mConfidence > 0.9)
             {
-                if (this->mpLabels[i].getX() > 0)
+                for (int i = 0; i < this->mNumLabel; i++)
                 {
-                    float iou = this->getIoU(pV->mX, pV->mY, pV->mT, pV->mB,
-                                             this->mpLabels[pV->mLabelIndex].mLeft, this->mpLabels[pV->mLabelIndex].mRight,
-                                             this->mpLabels[pV->mLabelIndex].mTop, this->mpLabels[pV->mLabelIndex].mBottom);
-
-                    if (iou > 0.5)
+                    if (this->mpLabels[i].getX() > 0)
                     {
-                        if (this->mpLabels[i].mConfidence < pV->mConfidence)
-                        {
-                            this->mpLabels[i].setX(-1); // Give a more try;
-                        }
+                        float iou = this->getIoU(pV->mX, pV->mY, pV->mT, pV->mB,
+                                                 this->mpLabels[i].mLeft,
+                                                 this->mpLabels[i].mRight,
+                                                 this->mpLabels[i].mTop,
+                                                 this->mpLabels[i].mBottom);
 
-                        tryNext = TRUE;
+                        LOGD("IoU: %f, New : %s, Cur: %s", iou, this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[i].getLabel());
+
+                        if (iou > 0.5)
+                        {
+                            LOGD("Confidence: %f, %f", pV->mConfidence, this->mpLabels[i].mConfidence);
+                            if (this->mpLabels[i].mConfidence < pV->mConfidence)
+                            {
+                                LOGD("Next try: %s", this->mpLabels[i].getLabel());
+                                this->mpLabels[i].setX(-1); // Give a more try;
+                            }
+
+                            tryNext = TRUE;
+                        }
                     }
                 }
-            }
 
-            if (tryNext == FALSE)
-            {
-                this->mpLabels[pV->mLabelIndex].setX(pV->mX);
-                this->mpLabels[pV->mLabelIndex].setY(pV->mY);
-                this->mpLabels[pV->mLabelIndex].mLeft = pV->mX;
-                this->mpLabels[pV->mLabelIndex].mRight = pV->mY;
-                this->mpLabels[pV->mLabelIndex].mTop = pV->mT;
-                this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
-                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+                if (tryNext == FALSE) {
+                    LOGD("User %s added", this->mpLabels[pV->mLabelIndex].getLabel());
+                    this->mpLabels[pV->mLabelIndex].setX(1);
+                    this->mpLabels[pV->mLabelIndex].setY(1);
+                    this->mpLabels[pV->mLabelIndex].mLeft = pV->mX;
+                    this->mpLabels[pV->mLabelIndex].mRight = pV->mY;
+                    this->mpLabels[pV->mLabelIndex].mTop = pV->mT;
+                    this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                    this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+                    this->mpLabels[pV->mLabelIndex].mChecked = 0;
+#if (USE_UPDATE_CHECK == 1)
+                    this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
+                }
             }
         }
     }

@@ -364,13 +364,16 @@ void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh, in
 
     if (dirmode == 1)
     {
+        char target_dir_name[256];
+
         printf("Enter Image Dir Path: ");
         fflush(stdout);
         input = fgets(input, 256, stdin);
         if(!input) return;
         strtok(input, "\n");
 
-        pDp = opendir(input);
+        sprintf(target_dir_name, "%s/%s", "../face_register/input/", input);
+        pDp = opendir(target_dir_name);
 
         if (pDp)
         {
@@ -381,7 +384,7 @@ void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh, in
 
             while (pDirent = readdir(pDp))
             {
-                sprintf(temp, "%s/%s", input, pDirent->d_name);
+                sprintf(temp, "%s/%s", target_dir_name, pDirent->d_name);
                 stat(temp, &statbuf);
 
                 if (S_ISREG(statbuf.st_mode))
@@ -446,7 +449,7 @@ void face_yolo(char *cfgfile, char *weightfile, char *filename, float thresh, in
 void run_yolo(int argc, char **argv)
 {
     char *prefix = find_char_arg(argc, argv, "-prefix", 0);
-    float thresh = find_float_arg(argc, argv, "-thresh", .2);
+    float thresh = find_float_arg(argc, argv, "-thresh", 0.3);
     int cam_index = find_int_arg(argc, argv, "-c", 0);
     int frame_skip = find_int_arg(argc, argv, "-s", 0);
 

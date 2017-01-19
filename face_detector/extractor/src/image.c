@@ -204,6 +204,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     int n = 0;
     char filename[80];
     int classes = 1;
+    int need_reset_label_check_info = 1;
 
     redisReply *pReply = NULL;
 
@@ -214,14 +215,14 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     image original_image = copy_image(im);
 
     gUploadStep++;
-    gUploadStep %= 1;
+    gUploadStep %= 4;
 
     if (gUploadStep == 0 && pRC)
     {
         char number[3];
 
         gFrameSeq++;
-        gFrameSeq %= 15;
+        gFrameSeq %= 90;
         sprintf(number, "%d", gFrameSeq);
 
         redisCommand(pRC, "SET %s %s", "frame", number);
@@ -234,13 +235,14 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
         if(prob > thresh)
         {
-
             int width = im.h * .012;
 
             if (0) {
                 width = pow(prob, 1. / 2.) * 10 + 1;
                 alphabet = 0;
             }
+
+            //printf("Prob: %f\n", prob);
 
             box b = boxes[i];
 
@@ -253,6 +255,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             //int center_y = (top + bot) / 2;
             int padding = (right - left) / 10; // 10 % width.
 
+            //padding = 0;
             //printf("center: %d, %d\n", center_x, center_y);
 
             // Extend
@@ -261,17 +264,10 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             int padded_top = top - padding;
             int padded_bot = bot + padding;
 
-
             if (padded_left < 0) padded_left = 0;
             if (padded_right > im.w - 1) padded_right = im.w - 1;
             if (padded_top < 0) padded_top = 0;
             if (padded_bot > im.h - 1) padded_bot = im.h - 1;
-
-            // Save face box image. Added by Seongho Baek 2016.12.20
-            memset(filename, 0, 80);
-            sprintf(filename, "/tmp/face_%d", n++);
-
-            image box_image = crop_image(original_image, padded_left, padded_top, padded_right - padded_left, padded_bot - padded_top);
 
             if (gUploadStep == 0)
             {
@@ -279,6 +275,22 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 FILE            *p_img_file = NULL;
                 int             length = 0;
                 char            img_file_name[256];
+
+                // Save face box image. Added by Seongho Baek 2016.12.20
+                memset(filename, 0, 80);
+                sprintf(filename, "/tmp/face_%d", n++);
+
+                image box_image = crop_image(original_image, padded_left, padded_top, padded_right - padded_left, padded_bot - padded_top);
+                image resized_image;
+
+                {
+                    float height = padded_bot - padded_top;
+                    float factor = 128 / height;
+
+                    resized_image = resize_image(box_image, factor*(padded_right - padded_left), factor*(padded_bot - padded_top));
+                    free_image(box_image);
+                    box_image = resized_image;
+                }
 
                 // Save jpg file to temp.
                 save_image(box_image, filename);
@@ -308,7 +320,6 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 memcpy(&payload[9],(unsigned char*)&padded_top, sizeof(int));
                 memcpy(&payload[13],(unsigned char*)&padded_bot, sizeof(int));
 
-
                 fread(&payload[17], 1, length, p_img_file);
 
                 if (pRC)
@@ -329,8 +340,14 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
             if (alphabet)
             {
+                if (need_reset_label_check_info == 1)
+                {
+                    clear_label_check_info();
+                    need_reset_label_check_info = 0;
+                }
+
                 //printf("get label\n");
-                strlabel = get_lable_in_box(left, top, right, bot);
+                strlabel = get_label_in_box(left, top, right, bot);
 
                 //printf("draw label\n");
                 image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
@@ -339,7 +356,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             }
         }
 
-        sleep(0);
+        //sleep(0);
     }
 
     free_image(original_image);
@@ -387,7 +404,7 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
             int bot   = (b.y+b.h/2.)*im.h;
 
             int padding = (right - left) / 10; // 10 % width.
-
+            //padding = 0;
             //printf("center: %d, %d\n", center_x, center_y);
 
             // Extend
@@ -395,7 +412,6 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
             int padded_right = right + padding;
             int padded_top = top - padding;
             int padded_bot = bot + padding;
-
 
             if (padded_left < 0) padded_left = 0;
             if (padded_right > im.w - 1) padded_right = im.w - 1;
@@ -407,6 +423,16 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
             sprintf(filename, "/home/major/Temp/face_%d", g_pic_seq++);
 
             image box_image = crop_image(original_image, padded_left, padded_top, padded_right-padded_left,padded_bot-padded_top);
+            image resized_image;
+
+            {
+                float height = padded_bot - padded_top;
+                float factor = 128 / height;
+
+                resized_image = resize_image(box_image, factor*(padded_right - padded_left), factor*(padded_bot - padded_top));
+                free_image(box_image);
+                box_image = resized_image;
+            }
 
             save_image(box_image, filename);
             free_image(box_image);

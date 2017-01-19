@@ -57,6 +57,7 @@ def getRep(imgPath, multiple=False):
         raise Exception("Unable to load image: {}".format(imgPath))
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
+    rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
 
     if args.verbose:
         print("  + Original size: {}".format(rgbImg.shape))
@@ -65,14 +66,12 @@ def getRep(imgPath, multiple=False):
 
     start = time.time()
 
-    #drect = dlib.rectangle(long(0), long(0), long(rgbImg.shape[1]), long(rgbImg.shape[0]))
-
     if multiple:
         bbs = align.getAllFaceBoundingBoxes(rgbImg)
     else:
         bb1 = align.getLargestFaceBoundingBox(rgbImg)
         bbs = [bb1]
-        
+
     if len(bbs) == 0 or (not multiple and bb1 is None):
         raise Exception("Unable to find a face: {}".format(imgPath))
     if args.verbose:
@@ -138,15 +137,18 @@ def train(args):
     # ref:
     # http://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html#example-classification-plot-classifier-comparison-py
     elif args.classifier == 'RadialSvm':  # Radial Basis Function kernel
+        print('RadialSvm Classifier')
         # works better with C = 1 and gamma = 2
         clf = SVC(C=1, kernel='rbf', probability=True, gamma=2)
     elif args.classifier == 'DecisionTree':  # Doesn't work best
         clf = DecisionTreeClassifier(max_depth=20)
     elif args.classifier == 'GaussianNB':
+        print('GNB Classifier')
         clf = GaussianNB()
 
     # ref: https://jessesw.com/Deep-Learning/
     elif args.classifier == 'DBN':
+        print('DBN Classifier')
         from nolearn.dbn import DBN
         clf = DBN([embeddings.shape[1], 500, labelsNum[-1:][0] + 1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.3,
@@ -256,7 +258,7 @@ if __name__ == '__main__':
     inferParser.add_argument('imgs', type=str, nargs='+',
                              help="Input image.")
     inferParser.add_argument('--multi', help="Infer multiple faces in image",
-                             action="store_true")
+                             action="store_false")
 
     args = parser.parse_args()
     if args.verbose:

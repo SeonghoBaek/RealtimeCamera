@@ -1,4 +1,4 @@
 #!/bin/bash
 # if you use CUDA don't set this.
 #export OMP_NUM_THREADS=2
-python recognizer.py
+python recognizer.py --cuda

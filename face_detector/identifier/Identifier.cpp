@@ -56,7 +56,12 @@ int run_identifier() {
     return 0;
 }
 
-char *get_lable_in_box(int left, int top, int right, int bottom)
+void clear_label_check_info()
+{
+    pGVCF->resetLabelCheck();
+}
+
+char *get_label_in_box(int left, int top, int right, int bottom)
 {
     int center_x = -1;
     int center_y = -1;

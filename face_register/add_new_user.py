@@ -87,6 +87,7 @@ def getRep(imgPath, multiple=False):
     else:
         bb1 = align.getLargestFaceBoundingBox(rgbImg)
         bbs = [bb1]
+
     if len(bbs) == 0 or (not multiple and bb1 is None):
         #raise Exception("Unable to find a face: {}".format(imgPath))
         print("Unable to find a face")
@@ -145,8 +146,8 @@ def inferAndSaveRep(userdataFile, faceFile):
 
 fileSeqNum = 0
 
-while True:
-    data = p.get_message()
+for item in p.listen():
+    data = item
 
     if data is not None :
         data = data.get('data')
@@ -154,11 +155,7 @@ while True:
         if data != 1L:
             temp = array.array('B', data)
             ar = np.array(temp, dtype=np.uint8)
-
-            frameNum = ar[0]
-            center_x = ar[1]
-            center_y = ar[2]
-            ar = ar[3:]
+            ar = ar[17:]
 
             userName = args.name
             baseDir = "./input"
