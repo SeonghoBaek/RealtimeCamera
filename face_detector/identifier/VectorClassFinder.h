@@ -33,6 +33,7 @@ public:
     float   mConfidence;
     double  mUpdateTime;
     int     mChecked;
+    int     mLabelIndex;
 
     Label()
     {
@@ -46,6 +47,7 @@ public:
         mVersion = 0;
         mUpdateTime = 0;
         mChecked = 0;
+        mLabelIndex = -1;
     }
 
     void setX(int x)
@@ -108,7 +110,15 @@ public:
     {
         mpLabel = NULL;
         mpNext = NULL;
-        mpPrev = NULL;
+        mpPrev = this;
+    }
+
+    virtual ~LabelListItem()
+    {
+        if (mpLabel)
+        {
+            delete mpLabel;
+        }
     }
 };
 
@@ -128,6 +138,7 @@ private:
 
     float       getDistance(int sx, int sy, int tx, int ty);
     float       getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom);
+    void        updateLabel(Label *pLabel, Vector* pVector);
 
 public:
     IMPLEMENT_THREAD(run());
@@ -239,7 +250,7 @@ public:
 
     int looperCallback(const char *event) override;
 
-    char* getClosestLabel(int center_x, int center_y);
+    char* getClosestLabel(int center_x, int center_y) {return NULL;}
 
     char* getClosestIoULabel(int left, int right, int top, int bottom);
 

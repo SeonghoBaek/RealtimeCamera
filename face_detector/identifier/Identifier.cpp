@@ -11,14 +11,10 @@
 extern "C" {
 #endif
 
-char *label_array[11] = {"SeonghoBaek", "ByongrakSeo", "HyungkiNoh", "kiyoungKim", "MinsamKo", "YonbeKim", "DaeyoungPark", "JangHyungLee", "KwangheeLee", "SanghoonLee", "Unknown"};
-
-extern int G_LABEL_INDEX;
-
 VectorClassFinder *pGVCF = NULL;
 
 int run_identifier() {
-    //signal(SIGPIPE, SIG_IGN);
+    signal(SIGPIPE, SIG_IGN);
 
     //Looper *pLooper = new Looper(callback);
 

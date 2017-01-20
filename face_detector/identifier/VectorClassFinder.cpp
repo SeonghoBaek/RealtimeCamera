@@ -5,14 +5,27 @@
 #include "VectorClassFinder.h"
 #include "Log.h"
 #include <math.h>
+#include <hiredis.h>
 
 #define RESET_FREQ 60
 #define USE_UPDATE_CHECK 0
+#define USE_LINED_LIST 1
+#define IOU_SINGLE_MODE 1
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-int gResetTime = 0;
+#if (IOU_SINGLE_MODE == 1)
+float IOU_INTERSECT_NEW_USER = 0.7;
+float IOU_INTERSECT_CUR_USER = 0.4;
+float IOU_INTERSECT_TRACKING = 0.4;
+#else
+float IOU_INTERSECT_NEW_USER = 0.3;
+float IOU_INTERSECT_CUR_USER = 0.4;
+float IOU_INTERSECT_TRACKING = 0.4;
+#endif
+
+redisContext    *gRedisContext = NULL;
 
 float VectorClassFinder::getDistance(int sx, int sy, int tx, int ty)
 {
@@ -33,26 +46,34 @@ float VectorClassFinder::getIoU(int sleft, int sright, int stop, int sbottom, in
     if (r <= l) return 0.0;
     if (b <= t) return 0.0;
 
+#if (IOU_SINGLE_MODE == 1)
+    int interArea = (r - l + 1) * (b - t + 1);
+    int boxAArea = (sright - sleft + 1) * (sbottom - stop + 1);
+    float iou = (float)interArea / (float)(boxAArea);
+#else
     int interArea = (r - l + 1) * (b - t + 1);
     int boxAArea = (right - left + 1) * (bottom - top + 1);
     int boxBArea = (sright - sleft + 1) * (sbottom - stop + 1);
     float iou = (float)interArea / (float)(boxAArea + boxBArea - interArea);
-
-	/*
-    if (iou >= 1)
-    {
-        LOGD("sl: %d, sr: %d, st: %d, sb: %d", sleft, sright, stop, sbottom);
-        LOGD("tl: %d, tr: %d, tt: %d, tb: %d", left, right, top, bottom);
-        LOGD("l: %d, r: %d, t: %d, b: %d", l, r, t, b);
-        LOGD("boxA: %d, boxB: %d, Inter: %d", boxAArea, boxBArea, interArea);
-    }
-	*/
+#endif
 
     return iou;
 }
 
 void VectorClassFinder::resetLabelCheck()
 {
+#if (USE_LINED_LIST == 1)
+    LOCK(this->mFrameLock)
+    {
+        LabelListItem *pItem = this->mpActiveLabelList;
+
+        while (pItem != NULL)
+        {
+            pItem->mpLabel->mChecked = 0;
+            pItem = pItem->mpNext;
+        }
+    }
+#else
     LOCK(this->mFrameLock)
     {
         for (int i = 0; i < this->mNumLabel; i++)
@@ -60,17 +81,22 @@ void VectorClassFinder::resetLabelCheck()
             this->mpLabels[i].mChecked = 0;
         }
     }
+#endif
+}
+
+void VectorClassFinder::updateLabel(Label *pLabel, Vector *pV)
+{
+    pLabel->mConfidence = pV->mConfidence;
+    pLabel->mLeft = pV->mX;
+    pLabel->mRight = pV->mY;
+    pLabel->mTop = pV->mT;
+    pLabel->mBottom = pV->mB;
 }
 
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
 {
-    float IoU = 0.4;
-    int   index = -1;
-
-    //gResetTime++;
-    //gResetTime %= RESET_FREQ;
-
-    //LOGD("Check IOU");
+    int   max_iou_index = -1;
+    float IOU = IOU_INTERSECT_TRACKING;
 
 #if (USE_UPDATE_CHECK == 1)
     struct timeval time;
@@ -83,163 +109,157 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     }
     else
     {
-        cur = (double) time.tv_sec;
+        cur = (double)time.tv_sec + (double)time.tv_usec * .000001;
     }
 #endif
 
-    /*
-    if (gResetTime == 0)
+#if (USE_LINED_LIST == 1)
+    LOCK(this->mFrameLock)
     {
-        LOCK(this->mFrameLock)
+        LabelListItem *pItem = this->mpActiveLabelList;
+
+        while (pItem != NULL)
         {
-            for (int i = 0; i < this->mNumLabel; i++)
+            if (pItem->mpLabel->mChecked == 0)
             {
-                this->mpLabels[i].setX(-1);
-            }
-        }
-    }
-    else
-    */
-    {
-        LOCK(this->mFrameLock)
-        {
-            for (int i = 0; i < this->mNumLabel; i++)
-            {
-                //LOGD("X: %d, checked: %d", this->mpLabels[i].getX(), this->mpLabels[i].mChecked);
-                if (this->mpLabels[i].getX() > 0 && this->mpLabels[i].mChecked == 0)
+                //LOGD("Version: %d", this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion);
+
+                if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
                 {
+                    this->mpLabels[pItem->mpLabel->mLabelIndex].setX(-1);
 
-                    if (abs(this->mpLabels[i].mVersion - this->mVersion) > 15)
+                    LabelListItem *pDelItem = pItem;
+
+                    if (pItem == this->mpActiveLabelList) // Head
                     {
+                        this->mpActiveLabelList = pItem->mpNext;
 
-                        this->mpLabels[i].setX(-1);
-                        LOGD("Version diff: Disappeared? %s", this->mpLabels[i].getLabel());
-                        continue;
+                        if (pItem->mpNext != NULL)
+                        {
+                            pItem->mpNext->mpPrev = pItem->mpNext;
+                        }
+                    }
+                    else
+                    {
+                        pItem->mpPrev->mpNext = pItem->mpNext;
+
+                        if (pItem->mpNext != NULL)
+                        {
+                            pItem->mpNext->mpPrev = pItem->mpPrev;
+                        }
                     }
 
+                    LOGD("Version diff: Too old or Disappeared? %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
+
+                    pItem = pItem->mpPrev;
+
+                    delete pDelItem;
+                }
+                else
+                {
+                    int labelIndex = pItem->mpLabel->mLabelIndex;
+
                     float iou = this->getIoU(left, right, top, bottom,
-                                             this->mpLabels[i].mLeft,  this->mpLabels[i].mRight,  this->mpLabels[i].mTop,  this->mpLabels[i].mBottom);
+                                             this->mpLabels[labelIndex].mLeft,  this->mpLabels[labelIndex].mRight,
+                                             this->mpLabels[labelIndex].mTop, this->mpLabels[labelIndex].mBottom);
 
                     //LOGD("iou: %f", iou);
 
-                    if (iou >= IoU)
+                    if (iou >= IOU)
                     {
-#if (USE_UPDATE_CHECK == 1)
-                        if (cur - this->mpLabels[i].mUpdateTime > 4.0)
-                        {
-                            LOGD("diff: %f for %s", (float)(cur - this->mpLabels[i].mUpdateTime), this->mpLabels[i].getLabel());
-                            this->mpLabels[i].setX(-1);
-                            continue;
-                        }
-#endif
-                        index = i;
-                        IoU = iou;
-                        break;
+                        max_iou_index = labelIndex;
+
+                        //LOGD("OK Still %s", this->mpLabels[index].getLabel());
+
+                        //break;
                     }
                 }
             }
 
-            if (index != -1)
-            {
-                this->mpLabels[index].mRight = right;
-                this->mpLabels[index].mLeft = left;
-                this->mpLabels[index].mTop = top;
-                this->mpLabels[index].mBottom = bottom;
-
-                this->mpLabels[index].mVersion = this->mVersion;
-                this->mpLabels[index].mChecked = 1;
-
-                //LOGD("OK Still %s", this->mpLabels[index].getLabel());
-            }
+            if (pItem != NULL) pItem = pItem->mpNext;
         }
     }
+#else
 
-    //LOGD("index = %d", index);
-
-    if (index == -1) return "";
-
-    return this->mpLabels[index].getLabel();
-}
-
-char* VectorClassFinder::getClosestLabel(int center_x, int center_y)
-{
-    float closest = 0x0FFFFFFF;
-    int   index = -1;
-
-    gResetTime++;
-    gResetTime %= RESET_FREQ;
-
-
-    /*
-    if (gResetTime == 0)
-    {
-        LOCK(this->mFrameLock)
-        {
-            for (int i = 0; i < this->mNumLabel; i++)
-            {
-                this->mpLabels[i].setX(-1);
-            }
-        }
-    }
-    else
-    */
-    {
-        LOCK(this->mFrameLock)
-        {
-            for (int i = 0; i < this->mNumLabel; i++)
-            {
-                if (this->mpLabels[i].getX() > 0) {
-                    float dist = getDistance(this->mpLabels[i].getX(), this->mpLabels[i].getY(), center_x, center_y);
-
-                    LOGD("%d,%d to %d,%d, INDEX: %d, DIST: %f", this->mpLabels[i].getX(), this->mpLabels[i].getY(),
-                         center_x, center_y, i, dist);
-
-                    if (dist < closest) {
-                        closest = dist;
-                        index = i;
-                    }
-                }
-            }
-
-            if (closest > 78) {
-                index = -1;
-                this->mpLabels[index].setX(-1);
-            }
-
-            if (index != -1) {
-                this->mpLabels[index].setX(center_x);
-                this->mpLabels[index].setY(center_y);
-                this->mpLabels[index].versionUp();
-            }
-        }
-    }
-
-    if (index == -1) return "";
-
-    return this->mpLabels[index].getLabel();
-}
-
-int VectorClassFinder::nodtify(float data1, Vector& vector) {
-    int numQueue;
-
-    /*
     LOCK(this->mFrameLock)
     {
-        this->mNextFrame = vector.mFrame;
-
-        LOGD("Next Frame: %d, QSize: %d", this->mNextFrame, this->mVQ.getSize());
-
-        if (this->mCurrentFrame != -1)
+        for (int i = 0; i < this->mNumLabel; i++)
         {
-            if (this->mNextFrame != this->mCurrentFrame)
+            //LOGD("X: %d, checked: %d", this->mpLabels[i].getX(), this->mpLabels[i].mChecked);
+            if (this->mpLabels[i].getX() >= 0 && this->mpLabels[i].mChecked == 0)
             {
-                this->mVQ.clear();
-                this->mCurrentFrame = -1;
+
+                if (abs(this->mpLabels[i].mVersion - this->mVersion) > 15)
+                {
+
+                    this->mpLabels[i].setX(-1);
+                    LOGD("Version diff: Disappeared? %s", this->mpLabels[i].getLabel());
+                    continue;
+                }
+
+                float iou = this->getIoU(left, right, top, bottom,
+                                         this->mpLabels[i].mLeft,  this->mpLabels[i].mRight,  this->mpLabels[i].mTop,  this->mpLabels[i].mBottom);
+
+                //LOGD("iou: %f", iou);
+
+                if (iou >= IoU)
+                {
+#if (USE_UPDATE_CHECK == 1)
+                    if (cur - this->mpLabels[i].mUpdateTime > 4.0)
+                    {
+                        LOGD("diff: %f for %s", (float)(cur - this->mpLabels[i].mUpdateTime), this->mpLabels[i].getLabel());
+                        this->mpLabels[i].setX(-1);
+                        continue;
+                    }
+#endif
+                    index = i;
+                    IoU = iou;
+                    break;
+                }
             }
         }
-    }
-    */
 
+        if (index != -1)
+        {
+            this->mpLabels[index].mRight = right;
+            this->mpLabels[index].mLeft = left;
+            this->mpLabels[index].mTop = top;
+            this->mpLabels[index].mBottom = bottom;
+
+            this->mpLabels[index].mVersion = this->mVersion;
+            this->mpLabels[index].mChecked = 1;
+
+            //LOGD("OK Still %s", this->mpLabels[index].getLabel());
+        }
+    }
+
+
+#endif
+    //LOGD("index = %d", index);
+
+    if (max_iou_index == -1)
+    {
+        return "";
+    }
+    else
+    {
+        this->mpLabels[max_iou_index].mRight = right;
+        this->mpLabels[max_iou_index].mLeft = left;
+        this->mpLabels[max_iou_index].mTop = top;
+        this->mpLabels[max_iou_index].mBottom = bottom;
+        this->mpLabels[max_iou_index].mVersion = this->mVersion;
+        this->mpLabels[max_iou_index].mChecked = 1;
+
+#if (USE_UPDATE_CHECK == 1)
+        LOGD("latency: %f for %s", (float)(cur - this->mpLabels[max_iou_index].mUpdateTime), this->mpLabels[max_iou_index].getLabel());
+#endif
+    }
+
+    return this->mpLabels[max_iou_index].getLabel();
+}
+
+int VectorClassFinder::nodtify(float data1, Vector& vector)
+{
     this->mVQ.push(vector);
 
     this->mpLooper->wakeup();
@@ -249,6 +269,25 @@ int VectorClassFinder::nodtify(float data1, Vector& vector) {
 
 void VectorClassFinder::run()
 {
+
+    const char *hostname = "127.0.0.1";
+    int port = 6379;
+    struct timeval timeout = {1, 500000};
+
+    gRedisContext = redisConnectWithTimeout(hostname, port, timeout);
+
+    if (gRedisContext == NULL || gRedisContext->err)
+    {
+        if (gRedisContext)
+        {
+            LOGE("Connection Error: %s\n", gRedisContext->errstr);
+            redisFree(gRedisContext);
+            gRedisContext = NULL;
+        } else {
+            LOGE("Connection error: can't allocate redis context\n");
+        }
+    }
+
     this->mpLooper->wait(-1);
 }
 
@@ -272,9 +311,197 @@ int VectorClassFinder::looperCallback(const char *event) {
     }
     else
     {
-        cur = (double) time.tv_sec;
+        cur = (double) time.tv_sec + (double)time.tv_usec * .000001;
     }
 #endif
+
+#if (USE_LINED_LIST == 1)
+
+    LOCK(this->mFrameLock)
+    {
+        if (this->mpActiveLabelList == NULL)
+        {
+            LOGD("Add New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
+
+            LabelListItem *pItem = new LabelListItem();
+
+            if (pItem == NULL)
+            {
+                delete pV;
+
+                return -1;
+            }
+
+            pItem->mpLabel = new Label();
+
+            if (pItem->mpLabel == NULL)
+            {
+                delete pItem;
+
+                return -1;
+            }
+
+            Label *pNewLabel = pItem->mpLabel;
+
+            pNewLabel->mLabelIndex = pV->mLabelIndex;
+            this->mpLabels[pV->mLabelIndex].setX(1);
+            this->mpLabels[pV->mLabelIndex].setY(1);
+            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+            this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+
+            this->mpActiveLabelList = pItem;
+
+            if (gRedisContext)
+            {
+                char id[3];
+                sprintf(id, "%d", pV->mLabelIndex);
+
+                redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+            }
+
+#if (USE_UPDATE_CHECK == 1)
+            pNewLabel->mUpdateTime = cur;
+            this->mpLabels[pV->mLabelIndex].mUpdateTime = cur; // For fast check.
+#endif
+        }
+        else
+        {
+            if (this->mpLabels[pV->mLabelIndex].getX() == 1)
+            {
+                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+
+#if (USE_UPDATE_CHECK == 1)
+                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
+            }
+            else if (this->mpLabels[pV->mLabelIndex].getX() == 0)
+            {
+                this->mpLabels[pV->mLabelIndex].setX(1);
+                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                LOGD("Still: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+            }
+            else // -1
+            {
+                LabelListItem *pHead = this->mpActiveLabelList;
+
+                while (pHead != NULL)
+                {
+                    int labelIndex = pHead->mpLabel->mLabelIndex;
+
+                    float iou = this->getIoU(this->mpLabels[labelIndex].mLeft,
+                                             this->mpLabels[labelIndex].mRight,
+                                             this->mpLabels[labelIndex].mTop,
+                                             this->mpLabels[labelIndex].mBottom,
+                                             pV->mX, pV->mY, pV->mT, pV->mB);
+
+                    LOGD("IoU: %f, New : %s, Cur: %s", iou, this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[labelIndex].getLabel());
+
+                    if (iou > IOU_INTERSECT_NEW_USER)
+                    {
+                        LOGD("Confidence New: %f, Cur: %f", pV->mConfidence, this->mpLabels[labelIndex].mConfidence);
+                        if (this->mpLabels[labelIndex].mConfidence < pV->mConfidence)
+                        {
+                            if (this->mpLabels[labelIndex].getX() == 0)
+                            {
+                                pHead->mpLabel->mLabelIndex = pV->mLabelIndex;
+
+                                LOGD("Believe: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+
+                                if (gRedisContext)
+                                {
+                                    char id[3];
+                                    sprintf(id, "%d", pV->mLabelIndex);
+
+                                    redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+                                }
+
+                                this->mpLabels[pV->mLabelIndex].setX(1);
+                                this->mpLabels[pV->mLabelIndex].setY(1);
+                                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                                this->mpLabels[labelIndex].setX(-1); // Clear
+                            }
+                            else
+                            {
+                                LOGD("One more try: %s", this->mpLabels[labelIndex].getLabel());
+                                this->mpLabels[labelIndex].setX(0); // Give a more try;
+                                this->mpLabels[labelIndex].mVersion = this->mVersion;
+                            }
+                        }
+                        else
+                        {
+                            if (this->mpLabels[labelIndex].getX() == 0)
+                            {
+                                this->mpLabels[labelIndex].setX(1);
+                                this->mpLabels[labelIndex].mVersion = this->mVersion;
+                                LOGD("Dismiss: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+                            }
+                            else
+                            {
+                                LOGD("Ignore: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+                            }
+                        }
+
+                        break;
+                    }
+
+                    pHead = pHead->mpNext;
+                }
+
+                if (pHead == NULL)
+                {
+                    LOGD("Find New User: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+
+                    LabelListItem *pItem = new LabelListItem();
+
+                    if (pItem == NULL)
+                    {
+                        delete pV;
+
+                        return -1;
+                    }
+
+                    pItem->mpLabel = new Label();
+
+                    if (pItem->mpLabel == NULL)
+                    {
+                        delete pItem;
+
+                        return -1;
+                    }
+
+                    Label *pNewLabel = pItem->mpLabel;
+
+                    pNewLabel->mLabelIndex = pV->mLabelIndex;
+
+                    this->mpLabels[pV->mLabelIndex].setX(1);
+                    this->mpLabels[pV->mLabelIndex].setY(1);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                    this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+
+                    pItem->mpNext = this->mpActiveLabelList;
+                    this->mpActiveLabelList->mpPrev = pItem;
+
+                    this->mpActiveLabelList = pItem;
+
+                    if (gRedisContext)
+                    {
+                        char id[3];
+                        sprintf(id, "%d", pV->mLabelIndex);
+
+                        redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+                    }
+                }
+            }
+        }
+    }
+
+#else
 
     LOCK(this->mFrameLock)
     {
@@ -282,6 +509,7 @@ int VectorClassFinder::looperCallback(const char *event) {
         {
 #if 1
             this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
 #if (USE_UPDATE_CHECK == 1)
             this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
 #endif
@@ -328,13 +556,15 @@ int VectorClassFinder::looperCallback(const char *event) {
                         if (iou > 0.5)
                         {
                             LOGD("Confidence: %f, %f", pV->mConfidence, this->mpLabels[i].mConfidence);
+                            tryNext = TRUE;
+
                             if (this->mpLabels[i].mConfidence < pV->mConfidence)
                             {
                                 LOGD("Next try: %s", this->mpLabels[i].getLabel());
                                 this->mpLabels[i].setX(-1); // Give a more try;
-                            }
 
-                            tryNext = TRUE;
+                                break; // shortcut
+                            }
                         }
                     }
                 }
@@ -357,43 +587,7 @@ int VectorClassFinder::looperCallback(const char *event) {
             }
         }
     }
-
-    /*
-    if (pV->mpData)
-    {
-        LOCK(this->mFrameLock)
-        {
-            this->mCurrentFrame = pV->mFrame;
-        }
-
-        LOGI("Current Frame: %d", this->mCurrentFrame);
-
-
-        // Process.
-
-        // For queue latency test
-        //sleep(3);
-    }
-    */
-
-    /*
-    redisReply *pReply = (redisReply *)redisCommand(this->mpRedisIO->getContext(), "SMEMBERS user");
-
-    if (pReply->type == REDIS_REPLY_ARRAY)
-    {
-        for (int i = 0; i < pReply->elements; i++)
-        {
-            //LOGI("%u) %s", i, pR->element[i]->str);
-
-            if (pReply->element[i]->str)
-            {
-                LOGI("REDIS: %s", pReply->element[i]->str);
-            }
-        }
-    }
-
-    freeReplyObject(pReply);
-    */
+#endif
 
     delete pV;
 

@@ -71,7 +71,7 @@ DEPS = $(wildcard src/*.h) Makefile
 all: obj backup results $(EXEC)
 
 $(EXEC): $(OBJS)
-	$(CC) $(COMMON) $(CFLAGS) $^ -o ../bin/$@ $(LDFLAGS) 
+	$(CC) $(COMMON) $(CFLAGS) $^ -g -o ../bin/$@ $(LDFLAGS) 
 
 $(OBJDIR)%.o: %.c $(DEPS)
 	$(CC) $(COMMON) $(CFLAGS) -c $< -o $@ 

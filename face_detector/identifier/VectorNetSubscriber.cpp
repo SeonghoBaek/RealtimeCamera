@@ -3,10 +3,6 @@
 #include "Lock.h"
 #include "Log.h"
 
-//char *label_array[11] = {"SeonghoBaek", "ByongrakSeo", "HyungkiNoh", "kiyoungKim", "MinsamKo", "YonbeKim", "DaeyoungPark", "JangHyungLee", "KwangheeLee", "SanghoonLee", "Unknown"};
-
-volatile int G_LABEL_INDEX = 10;
-
 void VectorNetSubscriber::run()
 {
     int clientSock = -1;
@@ -28,6 +24,7 @@ void VectorNetSubscriber::run()
 
     while (1)
     {
+        LOGI("Wait Client Connection");
         clientSock = this->acceptOnSocket(this->mSd, NULL); // We accept only one client.
 
         if (clientSock != -1)
@@ -38,11 +35,13 @@ void VectorNetSubscriber::run()
 
             while (1)
             {
-                if ( (length = this->safeRead(this->mBuff, SOCK_PAGE_SIZE, -1)) < 0)
+                if ( (length = this->safeRead(this->mBuff, SOCK_PAGE_SIZE, -1)) <= 0)
                 {
                     LOGE("Socket Read Error");
                     break;
                 }
+
+                //LOGD("Read %d bytes", length);
 
                 float *f_array = (float *)this->mBuff;
 

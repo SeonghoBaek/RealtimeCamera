@@ -215,14 +215,14 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     image original_image = copy_image(im);
 
     gUploadStep++;
-    gUploadStep %= 4;
+    gUploadStep %= 1;
 
     if (gUploadStep == 0 && pRC)
     {
         char number[3];
 
         gFrameSeq++;
-        gFrameSeq %= 90;
+        gFrameSeq %= 30;
         sprintf(number, "%d", gFrameSeq);
 
         redisCommand(pRC, "SET %s %s", "frame", number);

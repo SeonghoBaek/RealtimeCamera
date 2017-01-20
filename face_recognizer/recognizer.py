@@ -19,7 +19,7 @@ from sklearn.mixture import GMM
 threshold = 0.80
 show_time = False
 debug = False
-info = True
+info = False
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
@@ -82,7 +82,7 @@ try:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect((HOST, PORT))
     sock_ready = True
-    debug_print('Connected')
+    #debug_print('Connected')
 except:
     sock_ready = False
 
@@ -120,12 +120,12 @@ def getRep(imgPath, multiple=False):
     else:
         bb1 = align.getLargestFaceBoundingBox(rgbImg)
         bbs = [bb1]
-        debug_print(bb1)
+        #debug_print(bb1)
 
 
     if len(bbs) == 0 or (not multiple and bb1 is None):
         #raise Exception("Unable to find a face: {}".format(imgPath))
-        #debug_print("Unable to find a face")
+        ##debug_print("Unable to find a face")
         return []
     """
 
@@ -213,7 +213,7 @@ def infer(fileName):
     confidence = 0.0
 
     if not reps:
-        #debug_print("Who are you?")
+        ##debug_print("Who are you?")
         return 'Unknown', confidence
 
     if len(reps) > 1:
@@ -239,7 +239,7 @@ def infer(fileName):
 
         if isinstance(clf, GMM):
             dist = np.linalg.norm(rep - clf.means_[maxI])
-            debug_print("  + Distance from the mean: {}".format(dist))
+            #debug_print("  + Distance from the mean: {}".format(dist))
 
     return person, confidence
 
@@ -258,7 +258,7 @@ def save_unknown_user(src, dirname=None):
         if not os.path.exists(target_dir):
             os.mkdir(target_dir)
 
-    debug_print("Save unknown to " + target_dir)
+    #debug_print("Save unknown to " + target_dir)
 
     fileSeqNum = 1 + len(os.listdir(target_dir))
     faceFile = target_dir + "/face_" + str(fileSeqNum) + ".jpg"
@@ -274,10 +274,8 @@ def int_from_bytes(b3, b2, b1, b0):
 
 def main():
     if redis_ready is False:
-        debug_print('REDIS not ready.')
+        #debug_print('REDIS not ready.')
         return
-
-    rds.set('frame', '1')
 
     cur_target_frame = -1
     next_target_frame = 1
@@ -312,17 +310,17 @@ def main():
 
                     frame_str = rds.get('frame')
 
-                    debug_print("recv frame: " + str(recv_frame) + ', x: ' + str(left) + ', y: ' + str(right) + ', t: ' + str(top) + ', b:' + str(bottom))
+                    #debug_print("recv frame: " + str(recv_frame) + ', x: ' + str(left) + ', y: ' + str(right) + ', t: ' + str(top) + ', b:' + str(bottom))
 
                     if cur_target_frame is -1:
                         cur_target_frame = recv_frame
 
-                    debug_print("current frame: " + str(cur_target_frame))
-                    debug_print("next frame: " + frame_str)
+                    #debug_print("current frame: " + str(cur_target_frame))
+                    #debug_print("next frame: " + frame_str)
 
-                    queued_frame = (int(frame_str) + 90 - recv_frame) % 90
+                    queued_frame = (int(frame_str) + 30 - recv_frame) % 30
 
-                    info_print('delayed: ' + str(queued_frame))    
+                    #debug_print('delayed: ' + str(queued_frame))    
 
                     next_target_frame = int(frame_str)
 
@@ -349,7 +347,7 @@ def main():
                             if sock_ready is True:
                                 b_array = bytes()
                                 floatList = [left, right, top, bottom, confidence, label_list.index(person)]
-                                debug_print("INDEX: " + str(label_list.index(person)))
+                                #debug_print("INDEX: " + str(label_list.index(person)))
                                 b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                 sock.send(b_array)
 
@@ -377,12 +375,14 @@ def main():
                                 if sock_ready is True:
                                     b_array = bytes()
                                     floatList = [left, right, top, bottom, confidence, label_list.index(person)]
-                                    debug_print("INDEX: " + str(label_list.index(person)))
+                                    #debug_print("INDEX: " + str(label_list.index(person)))
                                     b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                     sock.send(b_array)
 
                         else:
                             cur_target_frame = next_target_frame
+                else:
+                    rds.set('frame', '1')
     except:
         debug_print('Exit')
 
