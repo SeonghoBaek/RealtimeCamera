@@ -10,7 +10,7 @@
 #define RESET_FREQ 60
 #define USE_UPDATE_CHECK 0
 #define USE_LINED_LIST 1
-#define IOU_SINGLE_MODE 1
+#define IOU_SINGLE_MODE 0
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -87,10 +87,12 @@ void VectorClassFinder::resetLabelCheck()
 void VectorClassFinder::updateLabel(Label *pLabel, Vector *pV)
 {
     pLabel->mConfidence = pV->mConfidence;
+#if 1
     pLabel->mLeft = pV->mX;
     pLabel->mRight = pV->mY;
     pLabel->mTop = pV->mT;
     pLabel->mBottom = pV->mB;
+#endif
 }
 
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
@@ -143,10 +145,11 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     {
                         pItem->mpPrev->mpNext = pItem->mpNext;
 
-                        if (pItem->mpNext != NULL)
-                        {
-                            pItem->mpNext->mpPrev = pItem->mpPrev;
-                        }
+                    }
+
+                    if (pItem->mpNext != NULL)
+                    {
+                        pItem->mpNext->mpPrev = pItem->mpPrev;
                     }
 
                     LOGD("Version diff: Too old or Disappeared? %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
@@ -168,10 +171,9 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     if (iou >= IOU)
                     {
                         max_iou_index = labelIndex;
+                        IOU = iou;
 
                         //LOGD("OK Still %s", this->mpLabels[index].getLabel());
-
-                        //break;
                     }
                 }
             }
@@ -371,7 +373,10 @@ int VectorClassFinder::looperCallback(const char *event) {
             {
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
-                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+
+                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+                LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
 
 #if (USE_UPDATE_CHECK == 1)
                 this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
@@ -381,7 +386,8 @@ int VectorClassFinder::looperCallback(const char *event) {
             {
                 this->mpLabels[pV->mLabelIndex].setX(1);
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
                 LOGD("Still: %s", this->mpLabels[pV->mLabelIndex].getLabel());
             }
             else // -1
@@ -421,7 +427,8 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                                 this->mpLabels[pV->mLabelIndex].setX(1);
                                 this->mpLabels[pV->mLabelIndex].setY(1);
-                                this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
                                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
                                 this->mpLabels[labelIndex].setX(-1); // Clear

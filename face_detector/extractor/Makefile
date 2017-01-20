@@ -2,7 +2,7 @@ GPU=1
 CUDNN=1
 OPENCV=1
 REDIS=1
-DEBUG=0
+DEBUG=1
 
 ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
       -gencode arch=compute_30,code=sm_30 \
@@ -18,7 +18,7 @@ EXEC=darknet
 OBJDIR=./obj/
 
 CC=gcc
-NVCC=nvcc 
+NVCC=/usr/local/cuda/bin/nvcc
 OPTS=-Ofast
 LDFLAGS= -lm -pthread 
 COMMON= 
