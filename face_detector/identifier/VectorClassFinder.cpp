@@ -128,35 +128,43 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
                 if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
                 {
+                    LOGD("Version diff: Too old or Disappeared? %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
+
                     this->mpLabels[pItem->mpLabel->mLabelIndex].setX(-1);
 
                     LabelListItem *pDelItem = pItem;
 
                     if (pItem == this->mpActiveLabelList) // Head
                     {
+                        LOGD("Delete Head");
                         this->mpActiveLabelList = pItem->mpNext;
 
-                        if (pItem->mpNext != NULL)
+                        if (this->mpActiveLabelList != NULL)
                         {
-                            pItem->mpNext->mpPrev = pItem->mpNext;
+                            this->mpActiveLabelList->mpPrev = this->mpActiveLabelList;
                         }
+
+                        delete pDelItem;
+
+                        pItem = this->mpActiveLabelList;
+
+                        continue;
                     }
                     else
                     {
                         pItem->mpPrev->mpNext = pItem->mpNext;
 
+                        if (pItem->mpNext != NULL)
+                        {
+                            pItem->mpNext->mpPrev = pItem->mpPrev;
+                        }
+
+                        pItem = pItem->mpNext;
+
+                        delete pDelItem;
+
+                        continue;
                     }
-
-                    if (pItem->mpNext != NULL)
-                    {
-                        pItem->mpNext->mpPrev = pItem->mpPrev;
-                    }
-
-                    LOGD("Version diff: Too old or Disappeared? %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
-
-                    pItem = pItem->mpPrev;
-
-                    delete pDelItem;
                 }
                 else
                 {
@@ -376,7 +384,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                 //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
 
                 this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
+                //LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
 
 #if (USE_UPDATE_CHECK == 1)
                 this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;

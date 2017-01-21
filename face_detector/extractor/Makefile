@@ -25,7 +25,7 @@ COMMON=
 CFLAGS=-Wall -Wfatal-errors 
 
 ifeq ($(DEBUG), 1) 
-OPTS= -g
+OPTS= -g -ggdb
 endif
 
 CFLAGS+=$(OPTS)

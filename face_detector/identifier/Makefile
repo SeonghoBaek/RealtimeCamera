@@ -15,11 +15,11 @@ CPPFLAGS += $(addprefix -I,$(include_dirs))
 LDFLAGS += -levent -lhiredis -lpthread
 
 all : $(OBJS)
-	g++ -shared -g -o ../lib/libidentifier.so $(OBJS) $(LDFLAGS)
+	g++ -shared -g -ggdb -o ../lib/libidentifier.so $(OBJS) $(LDFLAGS)
 	rm -f $(OBJS)	
 
 %.o : %.cpp
-	g++ -fpic -c $< $(CPPFLAGS) -g -o $(@)
+	g++ -fpic -c $< $(CPPFLAGS) -g -ggdb -o $(@)
 
 clean :
 	rm -f $(OBJS)

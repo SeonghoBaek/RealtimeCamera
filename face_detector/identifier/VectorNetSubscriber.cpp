@@ -158,7 +158,7 @@ int VectorNetSubscriber::safeRead(void *buff, unsigned int length, int timeout)
         {
             strerror(errno);
 
-            LOGE("Connection Closed: %s");
+            LOGE("Connection Closed");
         }
 
 
