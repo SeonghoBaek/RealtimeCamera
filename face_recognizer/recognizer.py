@@ -16,10 +16,10 @@ import struct
 import dlib
 from sklearn.mixture import GMM
 
-threshold = 0.80
+threshold = 0.85
 show_time = False
 debug = False
-info = False
+info = True
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
@@ -233,9 +233,6 @@ def infer(fileName):
 
         if show_time is True:
             debug_print("Prediction took {} seconds.".format(time.time() - start))
-
-        if confidence < threshold:
-            person = 'Unknown'
 
         if isinstance(clf, GMM):
             dist = np.linalg.norm(rep - clf.means_[maxI])

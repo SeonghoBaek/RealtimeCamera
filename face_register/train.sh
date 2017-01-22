@@ -13,8 +13,8 @@ echo Embedding aligned face image..Wait
 
 echo Training SVM..Wait
 #./classifier.py --dlibFacePredictor ../openface/models/dlib/shape_predictor_68_face_landmarks.dat --cuda train --classifier GaussianNB  output/embedding/
-#./classifier.py --dlibFacePredictor ../openface/models/dlib/shape_predictor_68_face_landmarks.dat --cuda train --classifier RadialSvm  output/embedding/
-./classifier.py --dlibFacePredictor ../openface/models/dlib/shape_predictor_68_face_landmarks.dat --cuda train --classifier LinearSvm  output/embedding/
+./classifier.py --dlibFacePredictor ../openface/models/dlib/shape_predictor_68_face_landmarks.dat --cuda train --classifier RadialSvm  output/embedding/
+#./classifier.py --dlibFacePredictor ../openface/models/dlib/shape_predictor_68_face_landmarks.dat --cuda train --classifier LinearSvm  output/embedding/
 
 echo Export SVM model
 mv -f output/embedding/classifier.pkl ../svm/
