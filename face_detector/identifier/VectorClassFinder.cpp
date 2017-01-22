@@ -20,7 +20,7 @@ float IOU_INTERSECT_NEW_USER = 0.7;
 float IOU_INTERSECT_CUR_USER = 0.4;
 float IOU_INTERSECT_TRACKING = 0.4;
 #else
-float IOU_INTERSECT_NEW_USER = 0.3;
+float IOU_INTERSECT_NEW_USER = 0.5;
 float IOU_INTERSECT_CUR_USER = 0.4;
 float IOU_INTERSECT_TRACKING = 0.4;
 #endif
@@ -331,6 +331,13 @@ int VectorClassFinder::looperCallback(const char *event) {
     {
         if (this->mpActiveLabelList == NULL)
         {
+            if (pV->mConfidence < 0.9)
+            {
+                delete pV;
+
+                return 0;
+            }
+
             LOGD("Add New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
 
             LabelListItem *pItem = new LabelListItem();
@@ -379,6 +386,7 @@ int VectorClassFinder::looperCallback(const char *event) {
         {
             if (this->mpLabels[pV->mLabelIndex].getX() == 1)
             {
+                this->mpLabels[pV->mLabelIndex].setX(1); // For explicit action
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
                 //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
@@ -419,7 +427,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                         LOGD("Confidence New: %f, Cur: %f", pV->mConfidence, this->mpLabels[labelIndex].mConfidence);
                         if (this->mpLabels[labelIndex].mConfidence < pV->mConfidence)
                         {
-                            if (this->mpLabels[labelIndex].getX() == 0)
+                            if (this->mpLabels[labelIndex].getX() == 0 && pV->mConfidence > 0.9)
                             {
                                 pHead->mpLabel->mLabelIndex = pV->mLabelIndex;
 
@@ -468,7 +476,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                     pHead = pHead->mpNext;
                 }
 
-                if (pHead == NULL)
+                if (pHead == NULL && pV->mConfidence > 0.9)
                 {
                     LOGD("Find New User: %s", this->mpLabels[pV->mLabelIndex].getLabel());
 

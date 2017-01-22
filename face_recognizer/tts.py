@@ -6,6 +6,7 @@ import sys
 import urllib2
 import redis
 import time
+import datetime
 import subprocess
 
 HOST, PORT = "127.0.0.1", 6379
@@ -19,8 +20,7 @@ inputDir = baseDir + 'face_register/input'
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
 print(label_list)
 
-name_list = ['박대영', '이현규', '김진형', '이광희', '남경필', '고민삼', '이상훈', '백성호', '김태훈', '장윤석', '노형기',
-             '김기영', '이장형', '김연배', '서병락']
+name_list = ['서병락', '박대영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '백성호', '김태희', '장윤석', '김연배']
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
@@ -45,14 +45,26 @@ def main():
             if data is not None:
                 data = data.get('data')
 
-                if data != 1L:
+                if data > 1L:
+                    #pub.unsubscribe('tts')
                     index = int(data)
                     print('received ' + str(index))
 
                     msg = "안녕하세요."
                     name = name_list[index]
 
-                    msg = msg + name + '님 집에 가'
+                    now = datetime.datetime.now()
+
+                    if now.hour < 10:
+                        sentence = '굿모닝'
+                    elif now.hour < 12:
+                        sentence = '즐거운 점심'
+                    elif now.hour < 17:
+                        sentence = '졸지마세요'
+                    else:
+                        sentence = '퇴근하세요'
+
+                    msg = msg + name + '님 ' + sentence
 
                     encText = urllib2.quote(msg)
                     data = "speaker=mijin&speed=0&text=" + encText
@@ -76,6 +88,9 @@ def main():
 
                     else:
                         print("Error Code:" + rescode)
+
+                    #pub.subscribe('tts')
+
     except:
         print('Error')
 
