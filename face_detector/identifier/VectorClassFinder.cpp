@@ -6,6 +6,7 @@
 #include "Log.h"
 #include <math.h>
 #include <hiredis.h>
+#include "../sparse/sparse.h"
 
 #define RESET_FREQ 60
 #define USE_UPDATE_CHECK 0

@@ -2,6 +2,7 @@
 #include "Common.h"
 #include "Lock.h"
 #include "Log.h"
+#include "../sparse/sparse.h"
 
 void VectorNetSubscriber::run()
 {

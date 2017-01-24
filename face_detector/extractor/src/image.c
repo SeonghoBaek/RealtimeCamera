@@ -198,13 +198,16 @@ int     gUploadStep = 0;
 int     gFrameSeq = 0;
 float   gBoxRGB[] = {0.95, 0.95, 0.95};
 
+#define UPLOAD_STEP 4
+
 void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
 {
-    int i;
-    int n = 0;
-    char filename[80];
-    int classes = 1;
-    int need_reset_label_check_info = 1;
+    int     i;
+    int     n = 0;
+    char    filename[80];
+    int     classes = 1;
+    int     need_reset_label_check_info = 1;
+    char    img_file_name[256];
 
     redisReply *pReply = NULL;
 
@@ -215,7 +218,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     image original_image = copy_image(im);
 
     gUploadStep++;
-    gUploadStep %= 1;
+    gUploadStep %= UPLOAD_STEP;
 
     if (gUploadStep == 0 && pRC)
     {
@@ -274,7 +277,6 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 unsigned char   *payload = NULL;
                 FILE            *p_img_file = NULL;
                 int             length = 0;
-                char            img_file_name[256];
 
                 // Save face box image. Added by Seongho Baek 2016.12.20
                 memset(filename, 0, 80);
@@ -348,6 +350,17 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
 
                 //printf("get label\n");
                 strlabel = get_label_in_box(left, top, right, bot);
+
+#ifdef USE_SRC
+                if (gUploadStep == 0 && strlen(strlabel) > 1)
+                {
+                    //printf("image file: %s\n", img_file_name);
+                    if (test_image_file(img_file_name, strlabel) == -1)
+                    {
+                        strlabel = "";
+                    }
+                }
+#endif
 
                 //printf("draw label\n");
                 image label = get_label(alphabet, strlabel, (im.h * .03) / 10);

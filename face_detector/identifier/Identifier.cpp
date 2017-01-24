@@ -7,6 +7,10 @@
 #include "VectorSubscriber.h"
 #include "VectorClassFinder.h"
 
+#ifdef USE_SRC
+#include "../sparse/sparse.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,38 +20,22 @@ VectorClassFinder *pGVCF = NULL;
 int run_identifier() {
     signal(SIGPIPE, SIG_IGN);
 
-    //Looper *pLooper = new Looper(callback);
-
-    /*
-    if (argc < 4)
-    {
-        LOGI("usage: %s <server> <port> <channel>", argv[0]);
-
-        return -1;
-    }
-
-    const char* pServer = argv[1];
-    int port = atoi(argv[2]);
-    const char* pChannel = argv[3];
-    */
-
     pGVCF = new VectorClassFinder();
 
     pGVCF->startThread();
 
     sleep(1);
-#if 0
-    // Using REDIS
-    //VectorSubscriber *vs = new VectorSubscriber("127.0.0.1", 6379, "vector");
-#else
+
     // TCP Socket
     VectorNetSubscriber *vs = new VectorNetSubscriber("127.0.0.1", 55555, pGVCF);
-#endif
 
     vs->startThread();
 
     sleep(1);
-    //pLooper->wait(-1);
+
+#ifdef USE_SRC
+    init_src_model();
+#endif
 
     return 0;
 }
@@ -59,13 +47,6 @@ void clear_label_check_info()
 
 char *get_label_in_box(int left, int top, int right, int bottom)
 {
-    int center_x = -1;
-    int center_y = -1;
-
-    //center_y = (bottom + top) / 2;
-    //center_x = (right + left) / 2;
-
-    //return pGVCF->getClosestLabel(center_x, center_y);
     return pGVCF->getClosestIoULabel(left, right, top, bottom);
 }
 
@@ -73,6 +54,23 @@ void version_up()
 {
     pGVCF->versionUp();
 }
+
+#ifdef USE_SRC
+void train_sparse()
+{
+    train(0, NULL);
+}
+
+void test_sparse()
+{
+    test(0, NULL);
+}
+
+int test_image_file(const char *image_file_path, const char *label)
+{
+    return src_test_file(image_file_path, label);
+}
+#endif
 
 #ifdef __cplusplus
 }

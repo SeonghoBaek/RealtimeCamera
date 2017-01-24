@@ -1,4 +1,4 @@
-include_dirs := . /usr/local/include/hiredis
+include_dirs := . /usr/local/include/hiredis ../sparse
 src_dir := .
 
 SRC = 
@@ -13,6 +13,8 @@ OBJS = $(subst .cpp,.o,$(SRCS))
 CPPFLAGS += $(addprefix -I,$(include_dirs))
 
 LDFLAGS += -levent -lhiredis -lpthread
+
+LDFLAGS += -L../lib -lsparse
 
 all : $(OBJS)
 	g++ -shared -g -ggdb -o ../lib/libidentifier.so $(OBJS) $(LDFLAGS)

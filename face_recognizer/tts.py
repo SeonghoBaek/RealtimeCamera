@@ -8,6 +8,7 @@ import redis
 import time
 import datetime
 import subprocess
+import random
 
 HOST, PORT = "127.0.0.1", 6379
 client_id = "m59KXbFvFqBB5aaTvZea"
@@ -20,7 +21,7 @@ inputDir = baseDir + 'face_register/input'
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
 print(label_list)
 
-name_list = ['서병락', '박대영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '백성호', '김태희', '장윤석', '김연배']
+name_list = ['박대영', '이현규', '김진형', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '장윤석', '노형기', '김기영', '이장형', '김연배', '서병락']
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
@@ -55,12 +56,48 @@ def main():
 
                     now = datetime.datetime.now()
 
-                    if now.hour < 10:
-                        sentence = '굿모닝'
+                    rv = random.randrange(1, 10)
+
+                    if now.hour < 11:
+                        if rv == 1:
+                            sentence = '좋은 아침이에요'
+                        elif rv == 2:
+                            sentence = '커피 한 잔 하세요'
+                        elif rv == 3:
+                            sentence = '좋은 하루되세요'
+                        elif rv == 4:
+                            sentence = '날씨가 좋네요'
+                        elif rv == 5:
+                            sentence = '너무 춥네요'
+                        elif rv == 6:
+                            sentence = '화이팅'
+                        elif rv == 7:
+                            sentence = '멋지네요'
+                        elif rv == 8:
+                            sentence = '즐거운 하루'
+                        else:
+                            sentence = '힘찬 하루'
                     elif now.hour < 12:
                         sentence = '즐거운 점심'
                     elif now.hour < 17:
-                        sentence = '졸지마세요'
+                        if rv == 1:
+                            sentence = '좋은 오후 보내세요'
+                        elif rv == 2:
+                            sentence = '커피 한 잔 하세요'
+                        elif rv == 3:
+                            sentence = '운동 좀 하세요'
+                        elif rv == 4:
+                            sentence = '날씨가 좋네요'
+                        elif rv == 5:
+                            sentence = '너무 춥네요'
+                        elif rv == 6:
+                            sentence = '감기 조심하세요'
+                        elif rv == 7:
+                            sentence = '산책 어떠세요'
+                        elif rv == 8:
+                            sentence = '쉬엄쉬엄 하세요'
+                        else:
+                            sentence = '졸지마세요'
                     else:
                         sentence = '퇴근하세요'
 

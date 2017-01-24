@@ -8,6 +8,9 @@
 #include "image.h"
 #include <dirent.h>
 #include <sys/stat.h>
+#include "identifier.h"
+#include "../../identifier/identifier.h"
+
 #ifdef OPENCV
 #include "opencv2/highgui/highgui_c.h"
 #endif
@@ -469,4 +472,8 @@ void run_yolo(int argc, char **argv)
     else if(0==strcmp(argv[2], "recall")) validate_yolo_recall(cfg, weights);
     else if(0==strcmp(argv[2], "camera")) run_camera(cfg, weights, thresh, cam_index, filename, face_class, 1);
     else if(0==strcmp(argv[2], "face")) face_yolo(cfg, weights, filename, thresh, 1);
+#ifdef USE_SRC
+    else if(0==strcmp(argv[2], "train_sparse")) train_sparse();
+    else if(0==strcmp(argv[2], "test_sparse")) test_sparse();
+#endif
 }
