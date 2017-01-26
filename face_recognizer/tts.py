@@ -21,7 +21,7 @@ inputDir = baseDir + 'face_register/input'
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
 print(label_list)
 
-name_list = ['박대영', '이현규', '김진형', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '장윤석', '노형기', '김기영', '이장형', '김연배', '서병락']
+name_list = ['박대영', '이현규', '김진형', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '장윤석', '노형기', '김기영', '이장형', '김연배', '서병락', '김휘영', '김대승']
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
