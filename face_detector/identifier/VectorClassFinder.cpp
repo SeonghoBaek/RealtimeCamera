@@ -26,7 +26,7 @@ float IOU_INTERSECT_CUR_USER = 0.4;
 float IOU_INTERSECT_TRACKING = 0.4;
 #endif
 
-redisContext    *gRedisContext = NULL;
+redisContext    *gTTSRedisContext = NULL;
 
 float VectorClassFinder::getDistance(int sx, int sy, int tx, int ty)
 {
@@ -281,19 +281,19 @@ int VectorClassFinder::nodtify(float data1, Vector& vector)
 void VectorClassFinder::run()
 {
 
-    const char *hostname = "127.0.0.1";
+    const char *hostname = "10.100.1.150";
     int port = 6379;
     struct timeval timeout = {1, 500000};
 
-    gRedisContext = redisConnectWithTimeout(hostname, port, timeout);
+    gTTSRedisContext = redisConnectWithTimeout(hostname, port, timeout);
 
-    if (gRedisContext == NULL || gRedisContext->err)
+    if (gTTSRedisContext == NULL || gTTSRedisContext->err)
     {
-        if (gRedisContext)
+        if (gTTSRedisContext)
         {
-            LOGE("Connection Error: %s\n", gRedisContext->errstr);
-            redisFree(gRedisContext);
-            gRedisContext = NULL;
+            LOGE("Connection Error: %s\n", gTTSRedisContext->errstr);
+            redisFree(gTTSRedisContext);
+            gTTSRedisContext = NULL;
         } else {
             LOGE("Connection error: can't allocate redis context\n");
         }
@@ -370,12 +370,12 @@ int VectorClassFinder::looperCallback(const char *event) {
 
             this->mpActiveLabelList = pItem;
 
-            if (gRedisContext)
+            if (gTTSRedisContext)
             {
                 char id[3];
                 sprintf(id, "%d", pV->mLabelIndex);
 
-                redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
             }
 
 #if (USE_UPDATE_CHECK == 1)
@@ -434,12 +434,12 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                                 LOGD("Believe: %s", this->mpLabels[pV->mLabelIndex].getLabel());
 
-                                if (gRedisContext)
+                                if (gTTSRedisContext)
                                 {
                                     char id[3];
                                     sprintf(id, "%d", pV->mLabelIndex);
 
-                                    redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+                                    redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
                                 }
 
                                 this->mpLabels[pV->mLabelIndex].setX(1);
@@ -513,12 +513,12 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                     this->mpActiveLabelList = pItem;
 
-                    if (gRedisContext)
+                    if (gTTSRedisContext)
                     {
                         char id[3];
                         sprintf(id, "%d", pV->mLabelIndex);
 
-                        redisCommand(gRedisContext, "PUBLISH %s %s", "tts", id);
+                        redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
                     }
                 }
             }

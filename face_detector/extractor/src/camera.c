@@ -134,7 +134,7 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
     image **alphabet = load_alphabet();
     int delay = 1;
 
-    const char *hostname = "127.0.0.1";
+    const char *hostname = "10.100.1.150";
     int port = 6379;
     struct timeval timeout = {1, 500000};
 

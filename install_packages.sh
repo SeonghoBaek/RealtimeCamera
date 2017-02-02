@@ -4,6 +4,7 @@ sudo apt-get install -y build-essential libboost-all-dev
 sudo apt-get install -y cmake git libgtk2.0-dev pkg-config libavcodec-dev libavformat-dev libswscale-dev curl git wget
 sudo apt-get install -y python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev libpng-dev libtiff-dev libjasper-dev libdc1394-22-dev
 sudo apt-get install -y graphicsmagick python-dev python-pip python-numpy python-nose python-scipy python-pandas python-protobuf
+sudo apt-get install -y sox libsox-fmt-all
 
 git clone https://github.com/opencv/opencv.git
 git clone https://github.com/opencv/opencv_contrib.git

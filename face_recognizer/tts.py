@@ -10,7 +10,7 @@ import datetime
 import subprocess
 import random
 
-HOST, PORT = "127.0.0.1", 6379
+HOST, PORT = "10.100.1.150", 6379
 client_id = "m59KXbFvFqBB5aaTvZea"
 client_secret = "M66UpJ4Gr5"
 
@@ -19,9 +19,10 @@ baseDir = fileDir + '/../'
 inputDir = baseDir + 'face_register/input'
 
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
+label_list.sort()
 print(label_list)
 
-name_list = ['박대영', '이현규', '김진형', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '장윤석', '노형기', '김기영', '이장형', '김연배', '서병락', '김휘영', '김대승']
+name_list = ['고아라', '서병락', '김대승', '박대영', '김휘영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '김연배', '장윤석']
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
@@ -119,9 +120,13 @@ def main():
                         with open('/tmp/welcome.mp3', 'wb') as f:
                             print("TTS mp3 save")
                             f.write(response_body)
-                            p = subprocess.Popen(['vlc', '-vvv', '/tmp/welcome.mp3'])
-                            time.sleep(4)
-                            p.terminate()
+                            #p = subprocess.Popen(['vlc', '-vvv', '/tmp/welcome.mp3'])
+                            print('Play tts')
+                            p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
+                            p.communicate()
+                            print('Play done')
+                            #time.sleep(4)
+                            #p.terminate()
 
                     else:
                         print("Error Code:" + rescode)

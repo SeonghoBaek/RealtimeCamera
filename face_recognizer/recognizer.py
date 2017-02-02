@@ -32,10 +32,12 @@ haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
 dlibDetector = dlib.get_frontal_face_detector()
 
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
+label_list.sort()
 print(label_list)
 
-HOST, PORT = "127.0.0.1", 55555
-
+HOST, PORT = "10.100.0.53", 55555
+REDIS_SERVER = '10.100.1.150'
+REDIS_PORT = 6379
 parser = argparse.ArgumentParser()
 
 #parser.add_argument('imgs', type=str, nargs='+', help="Input images.")
@@ -66,7 +68,7 @@ def info_print(str):
         print(str)
 
 try:
-    rds = redis.StrictRedis(host='127.0.0.1',port=6379,db=0)
+    rds = redis.StrictRedis(host=REDIS_SERVER,port=REDIS_PORT,db=0)
     p = rds.pubsub()
     p.subscribe('camera')
     redis_ready = True

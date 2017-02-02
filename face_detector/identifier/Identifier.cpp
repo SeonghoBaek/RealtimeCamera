@@ -27,7 +27,7 @@ int run_identifier() {
     sleep(1);
 
     // TCP Socket
-    VectorNetSubscriber *vs = new VectorNetSubscriber("127.0.0.1", 55555, pGVCF);
+    VectorNetSubscriber *vs = new VectorNetSubscriber("10.100.0.53", 55555, pGVCF);
 
     vs->startThread();
 

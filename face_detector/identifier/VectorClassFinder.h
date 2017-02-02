@@ -146,8 +146,9 @@ public:
     VectorClassFinder()
     {
         mpLooper = new Looper(this);
-        mpRedisIO = new RedisIO();
-        mpRedisIO->connect(2);
+        mpRedisIO = NULL;
+        //mpRedisIO = new RedisIO();
+        //mpRedisIO->connect(2);
         mCurrentFrame = -1;
         mNextFrame = -1;
         mFrameLock = Lock::createMutex();
@@ -189,6 +190,40 @@ public:
             this->mNumLabel = numLabels;
         }
 
+        this->mpLabels = new Label[this->mNumLabel];
+
+        struct dirent **namelist;
+        int n;
+
+        n = scandir(LABEL_DIRECTORY, &namelist, 0, alphasort);
+        int label_index = 0;
+
+        if (n < 0)
+            perror("scandir");
+        else
+        {
+            for (int i = 2; i < n; i++)
+            {
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY, namelist[i]->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
+                {
+                   //printf("%s\n", namelist[i]->d_name);
+                    if (strcmp(namelist[i]->d_name, unknown))
+                    {
+                        this->mpLabels[label_index].setLabel(namelist[i]->d_name);
+                        label_index++;
+                    }
+                }
+
+                free(namelist[i]);
+            }
+
+            free(namelist);
+        }
+
+        /*
         pDp = opendir(LABEL_DIRECTORY);
 
         if (pDp && this->mNumLabel > 0)
@@ -216,6 +251,7 @@ public:
 
             closedir(pDp);
         }
+         */
 
         for (int i = 0; i < this->mNumLabel; i++)
         {
