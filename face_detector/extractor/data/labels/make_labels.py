@@ -2,7 +2,8 @@ import os
 import string
 import pipes
 
-font = 'futura-normal'
+#font = 'futura-normal'
+font = 'Helvetica'
 
 def make_labels(s):
     l = string.printable
