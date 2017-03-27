@@ -2,38 +2,46 @@
 import redis
 import array
 import argparse
-import os
 import openface
-import numpy as np
 import cv2
 import pickle
 import time
 import ast
 import shutil
 import socket
-import sys
 import struct
 import dlib
 from sklearn.mixture import GMM
+from scipy.spatial import distance
+import os
+import pandas as pd
+from operator import itemgetter
+import numpy as np
 
 threshold = 0.85
+fn_threshold = 0.75
+dist_threashold = 0.3
 show_time = False
 debug = False
 info = True
+save_representation = False
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
 baseDir = fileDir + '/../' 
 modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
 inputDir = baseDir + 'face_register/input'
+repDir = baseDir + 'face_register/reps'
 dlibModelDir = os.path.join(modelDir, 'dlib')
 openfaceModelDir = os.path.join(modelDir, 'openface')
 haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
 dlibDetector = dlib.get_frontal_face_detector()
-
 label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
 label_list.sort()
 print(label_list)
+
+g_dist_list = {}
+g_embedding_list = {}
 
 HOST, PORT = "10.100.0.53", 55555
 REDIS_SERVER = '10.100.1.150'
@@ -225,6 +233,9 @@ def infer(fileName):
         rep = r[1].reshape(1, -1)
         bbx = r[0]
 
+        if save_representation is True:
+            save_rep(fileName, rep)
+
         if show_time is True:
             start = time.time()
 
@@ -240,7 +251,56 @@ def infer(fileName):
             dist = np.linalg.norm(rep - clf.means_[maxI])
             #debug_print("  + Distance from the mean: {}".format(dist))
 
+        if confidence < threshold:
+            if confidence > fn_threshold:
+                dist_list = []
+
+                print person, confidence
+
+                sz = len(g_embedding_list[person])
+
+                for i in range(sz):
+                    dst = distance.euclidean(g_embedding_list[person][i], rep)
+                    dist_list.append(dst)
+
+                m = np.mean(dist_list)
+
+                print m - g_dist_list[person]
+
+                if m - g_dist_list[person] < dist_threashold:
+                    confidence = threshold
+
     return person, confidence
+
+
+def save_rep(imgFile, rep, dirname=None):
+    if not os.path.exists(repDir):
+        os.mkdir(repDir)
+
+    target_dir = dirname
+
+    if target_dir is None:
+        target_dir = repDir + '/' + time.strftime("%d_%H_%M_%S")
+
+    if not os.path.exists(target_dir):
+        os.mkdir(target_dir)
+
+    if len(os.listdir(target_dir)) > 256:
+        target_dir = repDir + '/' + time.strftime("%d_%H_%M_%S")
+        if not os.path.exists(target_dir):
+            os.mkdir(target_dir)
+
+    #debug_print("Save unknown to " + target_dir)
+
+    fileSeqNum = 1 + len(os.listdir(target_dir))
+    faceFile = target_dir + "/face_" + str(fileSeqNum) + ".jpg"
+
+    shutil.copy2(imgFile, faceFile)
+
+    repFileName = target_dir + "/face_" + str(fileSeqNum) + "_rep.txt"
+    repFile = open(repFileName, "w")
+    repFile.write(str(rep))
+    repFile.close()
 
 
 def save_unknown_user(src, dirname=None):
@@ -271,6 +331,74 @@ def int_from_bytes(b3, b2, b1, b0):
     return (((((b3 << 8) + b2) << 8) + b1) << 8) + b0
 
 
+def create_rep_distance_list():
+    fileDir = os.path.dirname(os.path.realpath(__file__))
+    embeddingsDir = fileDir + '/../face_register/output/embedding'
+    fname = "{}/labels.csv".format(embeddingsDir)
+    labels = pd.read_csv(fname, header=None).as_matrix()[:, 1]
+
+    labels = map(itemgetter(1),
+                 map(os.path.split,
+                     map(os.path.dirname, labels)))  # Get the directory.
+
+    #print labels
+
+    fname = "{}/reps.csv".format(embeddingsDir)
+    embeddings = pd.read_csv(fname, header=None).as_matrix()
+
+    first_label = labels[0]
+
+    total_means = []
+    class_labels = []
+    classes = []
+
+    embedding_list = []
+    ems = []
+
+    for i in range(len(labels)):
+        if labels[i] == first_label:
+            classes.append(labels[i])
+            ems.append(embeddings[i])
+
+        else:
+            class_labels.append(classes)
+            embedding_list.append(ems)
+            classes = [labels[i]]
+            ems = [embeddings[i]]
+            first_label = labels[i]
+
+    class_labels.append(classes)
+    embedding_list.append(ems)
+
+    print len(class_labels)
+
+    for c in range(len(class_labels)):
+        class_mean = []
+
+        for p in range(len(class_labels[c])):
+            dist_list = []
+
+            for i in range(len(class_labels[c])):
+                if i == p:
+                    continue
+
+                dst = distance.euclidean(embedding_list[c][i], embedding_list[c][p])
+                dist_list.append(dst)
+
+            m = np.mean(dist_list)
+            class_mean.append(m)
+
+        m = np.mean(class_mean)
+        total_means.append(m)
+        print class_labels[c][0], m
+
+    for c in range(len(class_labels)):
+       g_dist_list[class_labels[c][0]] = total_means[c]
+
+    for c in range(len(class_labels)):
+        g_embedding_list[class_labels[c][0]] = embedding_list[c]
+
+
 def main():
     if redis_ready is False:
         #debug_print('REDIS not ready.')
@@ -287,6 +415,10 @@ def main():
     if not os.path.exists(dirname):
         os.mkdir(dirname)
 
+    create_rep_distance_list()
+
+    #print dist_list, embedding_list
+
     try:
         for item in p.listen():
             data = item
@@ -302,6 +434,8 @@ def main():
                     right = int_from_bytes(ar[8], ar[7], ar[6], ar[5])
                     top = int_from_bytes(ar[12], ar[11], ar[10], ar[9])
                     bottom = int_from_bytes(ar[16], ar[15], ar[14], ar[13])
+
+                    bbox_size = (right - left) * (bottom - top);
 
                     recv_frame = ar[0]
 
@@ -332,7 +466,7 @@ def main():
                         person, confidence = infer(fileName)
 
                         if confidence < threshold:
-                            info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                            info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)' + ', size: ' + str(bbox_size))
 
                             if confidence < threshold:
                                 save_unknown_user(fileName, dirname)
@@ -341,7 +475,7 @@ def main():
                             confidence = 0.0
 
                         else:
-                            info_print("{} : {:.2f} %".format(person, 100 * confidence))
+                            info_print("{} : {:.2f} %, size : {}".format(person, 100 * confidence, str(bbox_size)))
 
                             if sock_ready is True:
                                 b_array = bytes()
@@ -360,7 +494,8 @@ def main():
                             person, confidence = infer(fileName)
 
                             if confidence < threshold:
-                                info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                                #info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
+                                info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)' + ', size: ' + str(bbox_size))
 
                                 if confidence < threshold:
                                     dirname = save_unknown_user(fileName, dirname)
@@ -369,7 +504,8 @@ def main():
                                 person = "Unknown"
 
                             else:
-                                info_print("{} : {:.2f} %".format(person, 100 * confidence))
+                                #info_print("{} : {:.2f} %".format(person, 100 * confidence))
+                                info_print("{} : {:.2f} %, size : {}".format(person, 100 * confidence, str(bbox_size)))
 
                                 if sock_ready is True:
                                     b_array = bytes()
