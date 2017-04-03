@@ -164,7 +164,7 @@ def train(args):
                   # will be randomly dropped as a decimal.
         #          verbose=1)
 
-        clf = DBN([-1, 300, -1],  # i/p nodes, hidden nodes, o/p nodes
+        clf = DBN([-1, 256, 256, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
                   # Smaller steps mean a possibly more accurate result, but the
                   # training will take longer
