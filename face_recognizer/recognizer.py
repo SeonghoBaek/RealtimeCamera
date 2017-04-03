@@ -260,7 +260,7 @@ def infer(fileName):
         if person != person_dbn:
             return person, 0
 
-        if confidence <= threshold:
+        if confidence < threshold:
             if confidence > fn_threshold:
                 dist_list = []
 
@@ -281,6 +281,8 @@ def infer(fileName):
 
                 if t < dist_threashold:
                     confidence = np.max(confidence_dbn, confidence)
+                else:
+                    confidence = fn_threshold
 
         else:
             confidence = np.max(confidence_dbn, confidence)
@@ -322,13 +324,13 @@ def save_unknown_user(src, dirname=None):
     target_dir = dirname
 
     if target_dir is None:
-        target_dir = inputDir + '/Unknown/' + time.strftime("%d_%H_%M_%S")
+        target_dir = inputDir + '/../Unknown/' + time.strftime("%d_%H_%M_%S")
 
     if not os.path.exists(target_dir):
         os.mkdir(target_dir)
 
     if len(os.listdir(target_dir)) > 256:
-        target_dir = inputDir + '/Unknown/' + time.strftime("%d_%H_%M_%S")
+        target_dir = inputDir + '/../Unknown/' + time.strftime("%d_%H_%M_%S")
         if not os.path.exists(target_dir):
             os.mkdir(target_dir)
 
@@ -490,7 +492,7 @@ def main():
                             info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                             if confidence < threshold:
-                                save_unknown_user(fileName, dirname)
+                               dirname = save_unknown_user(fileName, dirname)
 
                             person = "Unknown"
                             confidence = 0.0

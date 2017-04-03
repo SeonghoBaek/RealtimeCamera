@@ -22,7 +22,7 @@ label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + 
 label_list.sort()
 print(label_list)
 
-name_list = ['고아라', '서병락', '김대승', '박대영', '김휘영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '백성호',  '김태희', '김연배', '이유니', '장윤석']
+name_list = ['고아라', '서병락', '김대승', '박대영', '김휘영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '오세창', '김석원', '백성호', '김성표', '김태희', '김연배', '이유니', '장윤석']
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
