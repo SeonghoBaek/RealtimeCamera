@@ -111,6 +111,7 @@ def train(args):
     fname = "{}/reps.csv".format(args.workDir)
     embeddings = pd.read_csv(fname, header=None).as_matrix()
     le = LabelEncoder().fit(labels)
+
     labelsNum = le.transform(labels)
 
     nClasses = len(le.classes_)
@@ -140,7 +141,7 @@ def train(args):
     elif args.classifier == 'RadialSvm':  # Radial Basis Function kernel
         print('RadialSvm Classifier')
         # works better with C = 1 and gamma = 2
-        clf = SVC(C=1, kernel='rbf', probability=True, gamma=2)
+        clf = SVC(C=1, kernel='rbf', degree=4, probability=True, gamma=2, decision_function_shape='ovr')
     elif args.classifier == 'DecisionTree':  # Doesn't work best
         clf = DecisionTreeClassifier(max_depth=20)
     elif args.classifier == 'GaussianNB':
@@ -151,18 +152,29 @@ def train(args):
     elif args.classifier == 'DBN':
         print('DBN Classifier')
         from nolearn.dbn import DBN
-        clf = DBN([embeddings.shape[1], 500, labelsNum[-1:][0] + 1],  # i/p nodes, hidden nodes, o/p nodes
-                  learn_rates=0.3,
+        #clf = DBN([embeddings.shape[1], 500, labelsNum[-1:][0] + 1],  # i/p nodes, hidden nodes, o/p nodes
+        #          learn_rates=0.3,
+                  # Smaller steps mean a possibly more accurate result, but the
+                  # training will take longer
+        #          learn_rate_decays=0.9,
+                  # a factor the initial learning rate will be multiplied by
+                  # after each iteration of the training
+        #          epochs=300,  # no of iternation
+                  # dropouts = 0.25, # Express the percentage of nodes that
+                  # will be randomly dropped as a decimal.
+        #          verbose=1)
+
+        clf = DBN([-1, 300, -1],  # i/p nodes, hidden nodes, o/p nodes
+                  learn_rates=0.1,
                   # Smaller steps mean a possibly more accurate result, but the
                   # training will take longer
                   learn_rate_decays=0.9,
                   # a factor the initial learning rate will be multiplied by
                   # after each iteration of the training
-                  epochs=300,  # no of iternation
+                  epochs=256,  # no of iternation
                   # dropouts = 0.25, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
                   verbose=1)
-
     if args.ldaDim > 0:
         clf_final = clf
         clf = Pipeline([('lda', LDA(n_components=args.ldaDim)),
@@ -280,7 +292,9 @@ network and classification models:
 Use `--networkModel` to set a non-standard Torch network model.""")
     start = time.time()
 
-    align = openface.AlignDlib(args.dlibFacePredictor)
+    if args.dlibFacePredictor != 'ignore':
+        align = openface.AlignDlib(args.dlibFacePredictor)
+
     net = openface.TorchNeuralNet(args.networkModel, imgDim=args.imgDim,
                                   cuda=args.cuda)
 

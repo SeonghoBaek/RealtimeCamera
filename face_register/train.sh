@@ -18,4 +18,9 @@ echo Training SVM..Wait
 
 echo Export SVM model
 mv -f output/embedding/classifier.pkl ../svm/
-echo Done. classifier.pkl
+echo Done. SVM classifier.pkl
+
+./classifier.py --dlibFacePredictor ignore --cuda train --classifier DBN  output/embedding/
+echo Export DBN model
+mv -f output/embedding/classifier.pkl ../dbn/
+echo Done. DBN classifier.pkl

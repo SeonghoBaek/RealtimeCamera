@@ -86,6 +86,7 @@ for c in range(len(class_labels)):
         #drow_distribution(dist_list, 'norm', 'histogram')
 
     m = np.mean(class_mean)
+    print np.min(class_mean), m
     #print class_labels[c][0], m
     total_means.append(m)
 
@@ -127,6 +128,7 @@ for pivot in range(len(class_labels)):
 
         m = np.mean(dist_list)
         class_mean.append(m)
+        #drow_distribution(dist_list, 'norm', 'histogram')
 
     m = np.mean(class_mean)
     total_means.append(m)
@@ -154,7 +156,7 @@ for c in range(len(class_labels)):
 
     m = np.mean(dist_list)
     class_mean.append(m)
-    drow_distribution(dist_list, 'norm', 'histogram')
+    #drow_distribution(dist_list, 'norm', 'histogram')
 
 #print class_mean
 
