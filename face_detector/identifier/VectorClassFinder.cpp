@@ -8,13 +8,16 @@
 #include <hiredis.h>
 #include "../sparse/sparse.h"
 
-#define RESET_FREQ 60
+#define RESET_FREQ 30
 #define USE_UPDATE_CHECK 0
 #define USE_LINED_LIST 1
 #define IOU_SINGLE_MODE 0
-
+#define BRIDGE_INTERVAL 5 // 5 Sec.
+#define USE_ROBOT 1
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define USE_TRACKING 0
+#define LABEL_VERSION_DIFF 30
 
 #if (IOU_SINGLE_MODE == 1)
 float IOU_INTERSECT_NEW_USER = 0.7;
@@ -23,7 +26,11 @@ float IOU_INTERSECT_TRACKING = 0.4;
 #else
 float IOU_INTERSECT_NEW_USER = 0.5;
 float IOU_INTERSECT_CUR_USER = 0.4;
-float IOU_INTERSECT_TRACKING = 0.4;
+float IOU_INTERSECT_TRACKING = 0.5;
+#endif
+
+#if (USE_ROBOT == 1)
+int gSupportRobot = 1;
 #endif
 
 redisContext    *gTTSRedisContext = NULL;
@@ -125,13 +132,25 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
         {
             if (pItem->mpLabel->mChecked == 0)
             {
-                //LOGD("Version: %d", this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion);
+                //LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
+                int invalidate = 0;
+                int tooOld = 0;
+
+                if (this->mpLabels[pItem->mpLabel->mLabelIndex].getX() == LABEL_INVALIDATE_STATE)
+                {
+                    invalidate = 1;
+                    LOGD("Invalidate: %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
+                }
 
                 if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
                 {
-                    LOGD("Version diff: Too old or Disappeared? %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
+                    LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
+                    tooOld = 1;
+                }
 
-                    this->mpLabels[pItem->mpLabel->mLabelIndex].setX(-1);
+                if (invalidate == 1 || tooOld == 1)
+                {
+                   this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
 
                     LabelListItem *pDelItem = pItem;
 
@@ -250,7 +269,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
     if (max_iou_index == -1)
     {
-        return "";
+        return "Guest";
     }
     else
     {
@@ -258,7 +277,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
         this->mpLabels[max_iou_index].mLeft = left;
         this->mpLabels[max_iou_index].mTop = top;
         this->mpLabels[max_iou_index].mBottom = bottom;
-        this->mpLabels[max_iou_index].mVersion = this->mVersion;
+        //this->mpLabels[max_iou_index].mVersion = this->mVersion;
         this->mpLabels[max_iou_index].mChecked = 1;
 
 #if (USE_UPDATE_CHECK == 1)
@@ -302,6 +321,175 @@ void VectorClassFinder::run()
     this->mpLooper->wait(-1);
 }
 
+int VectorClassFinder::sendToBridge(const char *name, void* buff, int size)
+{
+    int     localSocket = -1;
+    struct  timeval time;
+    double  cur;
+
+    if (gettimeofday(&time,NULL))
+    {
+        cur =  0;
+    }
+    else
+    {
+        cur = (double)time.tv_sec + (double)time.tv_usec * .000001;
+    }
+
+    if (this->mLastBridgeSendTime == 0)
+    {
+        this->mLastBridgeSendTime = cur;
+    }
+    else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL)
+    {
+        LOGI("Too Short Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+        return -1;
+    }
+
+    LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+
+    this->mLastBridgeSendTime = cur;
+
+    if ((localSocket = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
+    {
+        LOGE("Local Socket Creation Error\n");
+
+        return -1;
+    }
+
+    struct sockaddr_un address;
+    const size_t nameLength = strlen(name);
+
+    size_t pathLength = nameLength;
+
+    int abstractNamespace = ('/' != name[0]);
+
+    if (abstractNamespace)
+    {
+        pathLength++;
+    }
+
+    if (pathLength > sizeof(address.sun_path))
+    {
+        LOGE("Socket Path Too Long\n");
+        close(localSocket);
+
+        return -1;
+    }
+    else
+    {
+        memset(&address, 0, sizeof(address));
+
+        address.sun_family = PF_LOCAL;
+
+        char* sunPath = address.sun_path;
+
+        // First byte must be zero to use the abstract namespace
+        if (abstractNamespace)
+        {
+            *sunPath++ = 0;
+        }
+
+        strcpy(sunPath, name);
+
+        socklen_t addressLength = (offsetof(struct sockaddr_un, sun_path)) + pathLength;
+
+        if (connect(localSocket, (struct sockaddr*) &address, addressLength) < 0)
+        {
+            LOGE("Local Socket Connect Error\n");
+            close(localSocket);
+
+            return -1;
+        }
+    }
+
+    send(localSocket, buff, size, 0);
+
+    close(localSocket);
+
+    return 0;
+}
+
+int VectorClassFinder::fireUserEvent(int labelIndex)
+{
+    if (gSupportRobot)
+    {
+        if (this->sendToBridge("robot_bridge", (void *)"open", 4) == 0)
+        {
+            // Successful open.
+            this->mVersion = 0; // Reset.
+
+            if (gTTSRedisContext)
+            {
+                char id[3];
+                sprintf(id, "%d", labelIndex);
+
+                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
+            }
+        }
+    }
+    else
+    {
+        if (gTTSRedisContext)
+        {
+            char id[3];
+            sprintf(id, "%d", labelIndex);
+
+            redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
+        }
+    }
+
+    return 0;
+}
+
+int VectorClassFinder::addNewFace(Vector *pV)
+{
+    LOGD("Add New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
+
+    if (pV == NULL) return -1;
+
+    LabelListItem *pItem = new LabelListItem();
+
+    if (pItem == NULL)
+    {
+        delete pV;
+
+        return -1;
+    }
+
+    pItem->mpLabel = new Label();
+
+    if (pItem->mpLabel == NULL)
+    {
+        delete pItem;
+
+        return -1;
+    }
+
+    Label *pNewLabel = pItem->mpLabel;
+
+    pNewLabel->mLabelIndex = pV->mLabelIndex;
+    this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE);
+    this->mpLabels[pV->mLabelIndex].setY(1);
+    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+    this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+
+    if (this->mpActiveLabelList == NULL)
+    {
+        this->mpActiveLabelList = pItem;
+    }
+    else
+    {
+        pItem->mpNext = this->mpActiveLabelList;
+        this->mpActiveLabelList->mpPrev = pItem;
+
+        this->mpActiveLabelList = pItem;
+    }
+
+    return 0;
+}
+
 int VectorClassFinder::looperCallback(const char *event) {
     // No need to check event.
     Vector *pV = NULL;
@@ -334,49 +522,64 @@ int VectorClassFinder::looperCallback(const char *event) {
         {
             if (pV->mConfidence < 0.9)
             {
+                LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
+
+                this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+
                 delete pV;
 
                 return 0;
             }
 
-            LOGD("Add New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
+            int labelState = this->mpLabels[pV->mLabelIndex].getX();
 
-            LabelListItem *pItem = new LabelListItem();
-
-            if (pItem == NULL)
+            if (labelState != LABEL_READY_STATE)
             {
+                if (labelState == LABEL_INVALIDATE_STATE)
+                {
+                    LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+                    this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                }
+                else
+                {
+                    int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
+
+                    if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
+                    {
+                        LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
+                        this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    }
+                    else
+                    {
+                        LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+                        this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
+                        this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                    }
+                }
+
                 delete pV;
-
-                return -1;
+                return 0;
             }
-
-            pItem->mpLabel = new Label();
-
-            if (pItem->mpLabel == NULL)
+            else
             {
-                delete pItem;
+                int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
 
-                return -1;
+                if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
+                {
+                    LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                    delete pV;
+                    return 0;
+                }
             }
 
-            Label *pNewLabel = pItem->mpLabel;
+            LOGD("Find New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
 
-            pNewLabel->mLabelIndex = pV->mLabelIndex;
-            this->mpLabels[pV->mLabelIndex].setX(1);
-            this->mpLabels[pV->mLabelIndex].setY(1);
-            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-            this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-
-            this->mpActiveLabelList = pItem;
-
-            if (gTTSRedisContext)
-            {
-                char id[3];
-                sprintf(id, "%d", pV->mLabelIndex);
-
-                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
-            }
+            this->addNewFace(pV);
+            this->fireUserEvent(pV->mLabelIndex);
 
 #if (USE_UPDATE_CHECK == 1)
             pNewLabel->mUpdateTime = cur;
@@ -385,21 +588,33 @@ int VectorClassFinder::looperCallback(const char *event) {
         }
         else
         {
-            if (this->mpLabels[pV->mLabelIndex].getX() == 1)
+            int labelState = this->mpLabels[pV->mLabelIndex].getX();
+
+            if (labelState == LABEL_VALID_STATE)
             {
-                this->mpLabels[pV->mLabelIndex].setX(1); // For explicit action
-                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+#if (USE_TRACKING == 0)
+                // If not support tracking
+                if (pV->mConfidence < 0.9)
+                {
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                }
+                else
+#endif
+                {
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE); // For explicit action
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
-                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                    //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
 
-                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                //LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
-
+                    this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+                    //LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
+                }
 #if (USE_UPDATE_CHECK == 1)
                 this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
 #endif
             }
-            else if (this->mpLabels[pV->mLabelIndex].getX() == 0)
+            else if (labelState == 0)
             {
                 this->mpLabels[pV->mLabelIndex].setX(1);
                 this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
@@ -407,75 +622,141 @@ int VectorClassFinder::looperCallback(const char *event) {
                 this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
                 LOGD("Still: %s", this->mpLabels[pV->mLabelIndex].getLabel());
             }
-            else // -1
+            else if (labelState < LABEL_READY_STATE)
             {
+                if (pV->mConfidence < 0.9)
+                {
+                    LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                    delete pV;
+                    return 0;
+                }
+
+                LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+
+                if (labelState != LABEL_INVALIDATE_STATE)
+                {
+                    int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
+
+                    if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
+                    {
+                        LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
+                        this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                        this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                        delete pV;
+                        return 0;
+                    }
+                }
+
+                this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
+                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+            }
+            else if (labelState == LABEL_READY_STATE)// -1
+            {
+                int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
+
+                if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
+                {
+                    LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                    delete pV;
+                    return 0;
+                }
+
+                if (pV->mConfidence < 0.9)
+                {
+                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+
+                    delete pV;
+                    return 0;
+                }
+
+                // Simple Approach
+
+                LOGD("Find New User: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+
+                this->addNewFace(pV);
+                this->fireUserEvent(pV->mLabelIndex);
+
+#if (USE_UPDATE_CHECK == 1)
+                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
+                /*
                 LabelListItem *pHead = this->mpActiveLabelList;
 
-                while (pHead != NULL)
-                {
-                    int labelIndex = pHead->mpLabel->mLabelIndex;
 
-                    float iou = this->getIoU(this->mpLabels[labelIndex].mLeft,
-                                             this->mpLabels[labelIndex].mRight,
-                                             this->mpLabels[labelIndex].mTop,
-                                             this->mpLabels[labelIndex].mBottom,
-                                             pV->mX, pV->mY, pV->mT, pV->mB);
+               while (pHead != NULL)
+               {
+                   int labelIndex = pHead->mpLabel->mLabelIndex;
 
-                    LOGD("IoU: %f, New : %s, Cur: %s", iou, this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[labelIndex].getLabel());
+                   float iou = this->getIoU(this->mpLabels[labelIndex].mLeft,
+                                            this->mpLabels[labelIndex].mRight,
+                                            this->mpLabels[labelIndex].mTop,
+                                            this->mpLabels[labelIndex].mBottom,
+                                            pV->mX, pV->mY, pV->mT, pV->mB);
 
-                    if (iou > IOU_INTERSECT_NEW_USER)
-                    {
-                        LOGD("Confidence New: %f, Cur: %f", pV->mConfidence, this->mpLabels[labelIndex].mConfidence);
-                        if (this->mpLabels[labelIndex].mConfidence < pV->mConfidence)
-                        {
-                            if (this->mpLabels[labelIndex].getX() == 0 && pV->mConfidence > 0.9)
-                            {
-                                pHead->mpLabel->mLabelIndex = pV->mLabelIndex;
+                   LOGD("IoU: %f, New : %s, Cur: %s", iou, this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[labelIndex].getLabel());
 
-                                LOGD("Believe: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+                   if (iou > IOU_INTERSECT_NEW_USER)
+                   {
+                       LOGD("Confidence New: %f, Cur: %f", pV->mConfidence, this->mpLabels[labelIndex].mConfidence);
+                       if (this->mpLabels[labelIndex].mConfidence < pV->mConfidence)
+                       {
+                           if (this->mpLabels[labelIndex].getX() == 0 && pV->mConfidence > 0.9)
+                           {
+                               pHead->mpLabel->mLabelIndex = pV->mLabelIndex;
 
-                                if (gTTSRedisContext)
-                                {
-                                    char id[3];
-                                    sprintf(id, "%d", pV->mLabelIndex);
+                               LOGD("Believe: %s", this->mpLabels[pV->mLabelIndex].getLabel());
 
-                                    redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
-                                }
+                               if (gTTSRedisContext)
+                               {
+                                   char id[3];
+                                   sprintf(id, "%d", pV->mLabelIndex);
 
-                                this->mpLabels[pV->mLabelIndex].setX(1);
-                                this->mpLabels[pV->mLabelIndex].setY(1);
-                                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-                                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+                                   redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
+                               }
 
-                                this->mpLabels[labelIndex].setX(-1); // Clear
-                            }
-                            else
-                            {
-                                LOGD("One more try: %s", this->mpLabels[labelIndex].getLabel());
-                                this->mpLabels[labelIndex].setX(0); // Give a more try;
-                                this->mpLabels[labelIndex].mVersion = this->mVersion;
-                            }
-                        }
-                        else
-                        {
-                            if (this->mpLabels[labelIndex].getX() == 0)
-                            {
-                                this->mpLabels[labelIndex].setX(1);
-                                this->mpLabels[labelIndex].mVersion = this->mVersion;
-                                LOGD("Dismiss: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-                            }
-                            else
-                            {
-                                LOGD("Ignore: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-                            }
-                        }
+                               this->mpLabels[pV->mLabelIndex].setX(1);
+                               this->mpLabels[pV->mLabelIndex].setY(1);
+                               //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
+                               this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+                               this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
-                        break;
-                    }
+                               this->mpLabels[labelIndex].setX(-1); // Clear
+                           }
+                           else
+                           {
+                               LOGD("One more try: %s", this->mpLabels[labelIndex].getLabel());
+                               this->mpLabels[labelIndex].setX(0); // Give a more try;
+                               this->mpLabels[labelIndex].mVersion = this->mVersion;
+                           }
+                       }
+                       else
+                       {
+                           if (this->mpLabels[labelIndex].getX() == 0)
+                           {
+                               this->mpLabels[labelIndex].setX(1);
+                               this->mpLabels[labelIndex].mVersion = this->mVersion;
+                               LOGD("Dismiss: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+                           }
+                           else
+                           {
+                               LOGD("Ignore: %s", this->mpLabels[pV->mLabelIndex].getLabel());
+                           }
+                       }
 
-                    pHead = pHead->mpNext;
-                }
+                       break;
+                   }
+
+                   pHead = pHead->mpNext;
+               }
+
 
                 if (pHead == NULL && pV->mConfidence > 0.9)
                 {
@@ -513,6 +794,10 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                     this->mpActiveLabelList = pItem;
 
+#if (USE_UPDATE_CHECK == 1)
+                    this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+#endif
+
                     if (gTTSRedisContext)
                     {
                         char id[3];
@@ -520,7 +805,12 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                         redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
                     }
+
+                    {
+                        this->sendToBridge("robot_bridge", (void *)"open", 4);
+                    }
                 }
+                */
             }
         }
     }
@@ -593,7 +883,8 @@ int VectorClassFinder::looperCallback(const char *event) {
                     }
                 }
 
-                if (tryNext == FALSE) {
+                if (tryNext == FALSE)
+                {
                     LOGD("User %s added", this->mpLabels[pV->mLabelIndex].getLabel());
                     this->mpLabels[pV->mLabelIndex].setX(1);
                     this->mpLabels[pV->mLabelIndex].setY(1);
@@ -609,7 +900,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 #endif
                 }
             }
-        }
+        }*/
     }
 #endif
 

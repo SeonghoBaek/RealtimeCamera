@@ -18,9 +18,9 @@ import pandas as pd
 from operator import itemgetter
 import numpy as np
 
-threshold = 0.85
-fn_threshold = 0.75
-dist_threashold = 0.3
+threshold = 0.9
+fn_threshold = 0.7
+dist_threashold = 0.2
 show_time = False
 debug = False
 info = True
@@ -41,6 +41,7 @@ label_list.sort()
 print(label_list)
 
 g_dist_list = {}
+g_dist_mean_list = {}
 g_embedding_list = {}
 
 HOST, PORT = "10.100.0.53", 55555
@@ -85,7 +86,7 @@ except:
     redis_ready = False
 
 (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
-
+(le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
 sock_ready = False
 
 try:
@@ -240,18 +241,26 @@ def infer(fileName):
             start = time.time()
 
         predictions = clf.predict_proba(rep).ravel()
+        pred_dbn = clf_dbn.predict_proba(rep).ravel()
+
         maxI = np.argmax(predictions)
         person = le.inverse_transform(maxI)
         confidence = predictions[maxI]
 
+        maxI = np.argmax(pred_dbn)
+        person_dbn = le_dbn.inverse_transform(maxI)
+        confidence_dbn = pred_dbn[maxI]
+
         if show_time is True:
             debug_print("Prediction took {} seconds.".format(time.time() - start))
 
-        if isinstance(clf, GMM):
-            dist = np.linalg.norm(rep - clf.means_[maxI])
-            #debug_print("  + Distance from the mean: {}".format(dist))
+        print "DBN: ", person_dbn, confidence_dbn
+        print "SVM: ", person, confidence
 
-        if confidence < threshold:
+        if person != person_dbn:
+            return person, 0
+
+        if confidence <= threshold:
             if confidence > fn_threshold:
                 dist_list = []
 
@@ -264,11 +273,17 @@ def infer(fileName):
                     dist_list.append(dst)
 
                 m = np.mean(dist_list)
+                #m = np.max(dist_list)
 
-                print m - g_dist_list[person]
+                print m - g_dist_list[person], m - g_dist_mean_list[person]
 
-                if m - g_dist_list[person] < dist_threashold:
-                    confidence = threshold
+                t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
+
+                if t < dist_threashold:
+                    confidence = np.max(confidence_dbn, confidence)
+
+        else:
+            confidence = np.max(confidence_dbn, confidence)
 
     return person, confidence
 
@@ -320,7 +335,7 @@ def save_unknown_user(src, dirname=None):
     #debug_print("Save unknown to " + target_dir)
 
     fileSeqNum = 1 + len(os.listdir(target_dir))
-    faceFile = target_dir + "/face_" + str(fileSeqNum) + ".jpg"
+    faceFile = target_dir + "/face_" + time.strftime("%d_%H_%M_%S_") + str(fileSeqNum) + ".jpg"
 
     shutil.move(src, faceFile)
 
@@ -349,6 +364,7 @@ def create_rep_distance_list():
     first_label = labels[0]
 
     total_means = []
+    temp_means = []
     class_labels = []
     classes = []
 
@@ -370,7 +386,7 @@ def create_rep_distance_list():
     class_labels.append(classes)
     embedding_list.append(ems)
 
-    print len(class_labels)
+    #print len(class_labels)
 
     for c in range(len(class_labels)):
         class_mean = []
@@ -385,15 +401,20 @@ def create_rep_distance_list():
                 dst = distance.euclidean(embedding_list[c][i], embedding_list[c][p])
                 dist_list.append(dst)
 
+
             m = np.mean(dist_list)
             class_mean.append(m)
 
-        m = np.mean(class_mean)
+        mm = np.mean(class_mean)
+        m = np.min(class_mean)
         total_means.append(m)
+        temp_means.append(mm)
+
         print class_labels[c][0], m
 
     for c in range(len(class_labels)):
-       g_dist_list[class_labels[c][0]] = total_means[c]
+        g_dist_list[class_labels[c][0]] = total_means[c]
+        g_dist_mean_list[class_labels[c][0]] = temp_means[c]
 
     for c in range(len(class_labels)):
         g_embedding_list[class_labels[c][0]] = embedding_list[c]
@@ -407,10 +428,10 @@ def main():
     cur_target_frame = -1
     next_target_frame = 1
 
-    if not os.path.exists(inputDir + '/Unknown'):
-        os.mkdir(inputDir + '/Unknown')
+    if not os.path.exists(inputDir + '/../Unknown'):
+        os.mkdir(inputDir + '/../Unknown')
 
-    dirname = inputDir + '/Unknown/' + time.strftime("%d_%H_%M_%S")
+    dirname = inputDir + '/../Unknown/' + time.strftime("%d_%H_%M_%S")
 
     if not os.path.exists(dirname):
         os.mkdir(dirname)
@@ -466,7 +487,7 @@ def main():
                         person, confidence = infer(fileName)
 
                         if confidence < threshold:
-                            info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)' + ', size: ' + str(bbox_size))
+                            info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                             if confidence < threshold:
                                 save_unknown_user(fileName, dirname)
@@ -475,7 +496,8 @@ def main():
                             confidence = 0.0
 
                         else:
-                            info_print("{} : {:.2f} %, size : {}".format(person, 100 * confidence, str(bbox_size)))
+                            #info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
+                            info_print("{} : {} %".format(person, int(100 * confidence)))
 
                             if sock_ready is True:
                                 b_array = bytes()
@@ -495,7 +517,7 @@ def main():
 
                             if confidence < threshold:
                                 #info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
-                                info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)' + ', size: ' + str(bbox_size))
+                                info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
                                 if confidence < threshold:
                                     dirname = save_unknown_user(fileName, dirname)
@@ -505,7 +527,7 @@ def main():
 
                             else:
                                 #info_print("{} : {:.2f} %".format(person, 100 * confidence))
-                                info_print("{} : {:.2f} %, size : {}".format(person, 100 * confidence, str(bbox_size)))
+                                info_print("{} : {} %".format(person, int(100 * confidence)))
 
                                 if sock_ready is True:
                                     b_array = bytes()

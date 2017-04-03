@@ -17,6 +17,10 @@
 #define MAX_LABEL_LENGTH 80
 #define LABEL_DIRECTORY "../face_register/input"
 
+#define LABEL_INVALIDATE_STATE -1
+#define LABEL_READY_STATE -1
+#define LABEL_VALID_STATE 1
+
 class Label
 {
 private:
@@ -38,7 +42,7 @@ public:
     Label()
     {
         strcpy(mLabelString, "Unknown");
-        mCenterX = -1;
+        mCenterX = LABEL_INVALIDATE_STATE;
         mCenterY = -1;
         mLeft = 0;
         mRight = 0;
@@ -125,20 +129,22 @@ public:
 class VectorClassFinder:public IVectorNotifier, public Thread, public ILooper
 {
 private:
-    VectorQueue mVQ;
-    Looper      *mpLooper;
-    RedisIO     *mpRedisIO;
-    int         mCurrentFrame;
-    int         mNextFrame;
-    Mutex_t     mFrameLock;
-    int         mNumLabel;
-    Label       *mpLabels;
-    LabelListItem *mpActiveLabelList;
-    unsigned int mVersion;
+    VectorQueue     mVQ;
+    Looper          *mpLooper;
+    RedisIO         *mpRedisIO;
+    int             mCurrentFrame;
+    int             mNextFrame;
+    Mutex_t         mFrameLock;
+    int             mNumLabel;
+    Label           *mpLabels;
+    LabelListItem   *mpActiveLabelList;
+    unsigned int    mVersion;
+    double          mLastBridgeSendTime;
 
     float       getDistance(int sx, int sy, int tx, int ty);
     float       getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom);
     void        updateLabel(Label *pLabel, Vector* pVector);
+    int         sendToBridge(const char *name, void* buff, int size);
 
 public:
     IMPLEMENT_THREAD(run());
@@ -156,6 +162,7 @@ public:
         mpActiveLabelList = NULL;
         mpLabels = NULL;
         mVersion = 0;
+        mLastBridgeSendTime = 0;
 
         DIR *pDp;
         struct dirent *pDirent;
@@ -291,6 +298,10 @@ public:
     char* getClosestIoULabel(int left, int right, int top, int bottom);
 
     void resetLabelCheck();
+
+    int fireUserEvent(int labelIndex);
+
+    int addNewFace(Vector *pV);
 
     void versionUp()
     {

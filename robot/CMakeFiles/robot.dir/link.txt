@@ -1,0 +1,1 @@
+/usr/bin/cc  -g   CMakeFiles/robot.dir/robot.c.o CMakeFiles/robot.dir/bridge.c.o  -o robot -rdynamic -lpthread 

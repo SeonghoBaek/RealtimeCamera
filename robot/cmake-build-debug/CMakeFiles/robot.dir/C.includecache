@@ -1,0 +1,20 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/major/RealtimeCamera/robot/robot.c
+unistd.h
+-
+fcntl.h
+-
+assert.h
+-
+termio.h
+-
+string.h
+-
+

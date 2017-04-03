@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo Align face image..Wait
-rm -rf output/*
+#rm -rf output/*
 rm -f output/aligned/cache* > /dev/null
 rm -f output/embedding/cache* > /dev/null
 rm -rf input/Unknown > /dev/null

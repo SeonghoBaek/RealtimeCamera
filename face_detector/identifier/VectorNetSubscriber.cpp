@@ -68,7 +68,10 @@ void VectorNetSubscriber::run()
                 this->mpNotifier->nodtify(-1, v);
             }
 
+            close(this->mClientSd);
+
             this->mClientSd = -1;
+
         }
     }
 

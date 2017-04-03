@@ -1,0 +1,3 @@
+/home/major/RealtimeCamera/robot/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/major/RealtimeCamera/robot/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/home/major/RealtimeCamera/robot/cmake-build-debug/CMakeFiles/robot.dir
