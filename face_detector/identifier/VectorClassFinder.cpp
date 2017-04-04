@@ -290,6 +290,16 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
 int VectorClassFinder::nodtify(float data1, Vector& vector)
 {
+    if (data1 == 1)
+    {
+        LOCK(this->mFrameLock)
+        {
+            this->loadLabel();
+        }
+
+        return 0;
+    }
+
     this->mVQ.push(vector);
 
     this->mpLooper->wakeup();

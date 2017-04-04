@@ -163,7 +163,33 @@ public:
         mpLabels = NULL;
         mVersion = 0;
         mLastBridgeSendTime = 0;
+    }
 
+    virtual ~VectorClassFinder()
+    {
+        if (mFrameLock)
+        {
+            Lock::deleteMutex(this->mFrameLock);
+        }
+
+        if (mpLooper)
+        {
+            delete mpLooper;
+        }
+
+        if (mpRedisIO)
+        {
+            delete mpRedisIO;
+        }
+
+        if (mpLabels)
+        {
+            delete [] mpLabels;
+        }
+    }
+
+    void loadLabel()
+    {
         DIR *pDp;
         struct dirent *pDirent;
         pDp = opendir(LABEL_DIRECTORY);
@@ -171,13 +197,19 @@ public:
         struct stat statbuf;
         char temp[80];
 
+        if (mpLabels)
+        {
+            delete [] mpLabels;
+
+            mpLabels = NULL;
+        }
+
         if (pDp)
         {
             int numLabels = 0;
 
             readdir(pDp); // .
             readdir(pDp); // ..
-
 
             while (pDirent = readdir(pDp))
             {
@@ -216,7 +248,7 @@ public:
 
                 if (S_ISDIR(statbuf.st_mode))
                 {
-                   //printf("%s\n", namelist[i]->d_name);
+                    //printf("%s\n", namelist[i]->d_name);
                     if (strcmp(namelist[i]->d_name, unknown))
                     {
                         this->mpLabels[label_index].setLabel(namelist[i]->d_name);
@@ -263,29 +295,6 @@ public:
         for (int i = 0; i < this->mNumLabel; i++)
         {
             LOGD("LABEL: %s", this->mpLabels[i].getLabel());
-        }
-    }
-
-    virtual ~VectorClassFinder()
-    {
-        if (mFrameLock)
-        {
-            Lock::deleteMutex(this->mFrameLock);
-        }
-
-        if (mpLooper)
-        {
-            delete mpLooper;
-        }
-
-        if (mpRedisIO)
-        {
-            delete mpRedisIO;
-        }
-
-        if (mpLabels)
-        {
-            delete [] mpLabels;
         }
     }
 

@@ -34,6 +34,9 @@ void VectorNetSubscriber::run()
             LOGI("Client Accepted");
             this->mClientSd = clientSock;
 
+            Vector dummy;
+            this->mpNotifier->nodtify(1, dummy);
+
             while (1)
             {
                 if ( (length = this->safeRead(this->mBuff, SOCK_PAGE_SIZE, -1)) <= 0)
