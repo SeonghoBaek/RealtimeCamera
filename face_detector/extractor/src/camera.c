@@ -129,12 +129,12 @@ double get_wall_time()
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
 }
 
-void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes)
+void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *local_server, const char* redis_server, char **names, int classes)
 {
     image **alphabet = load_alphabet();
     int delay = 1;
 
-    const char *hostname = "10.100.1.150";
+    const char *hostname = redis_server;
     int port = 6379;
     struct timeval timeout = {1, 500000};
 
@@ -159,14 +159,18 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
     srand(2222222);
 
+    /*
     if (filename) {
         printf("video file: %s\n", filename);
         cap = cvCaptureFromFile(filename);
     } else {
-        printf("Start Camera Capture \n");
 
-        cap = cvCaptureFromCAM(cam_index);
     }
+     */
+
+    printf("Start Camera Capture \n");
+
+    cap = cvCaptureFromCAM(cam_index);
 
     if (!cap) {
         error("Couldn't connect to webcam.\n");
@@ -188,7 +192,7 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
     }
 #endif
 
-    run_identifier();
+    run_identifier(local_server);
 
     layer l = net.layers[net.n - 1];
     int j;
@@ -222,9 +226,11 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
         det_s = in_s;
     }
 
+#ifdef SHOW_WINDOW
     cvNamedWindow("Camera", CV_WINDOW_NORMAL);
     cvMoveWindow("Camera", 0, 0);
     cvResizeWindow("Camera", 1200, 900); // 1352 , 1013
+#endif
 
     while (1) {
         gFrameNum++;
@@ -233,7 +239,9 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
         if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
         if (pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
+#ifdef SHOW_WINDOW
         show_image(disp, "Camera");
+#endif
 
         int c = cvWaitKey(delay);
 
@@ -317,27 +325,6 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
 
         return;
     }
-
-
-#ifdef REDIS
-    gRedisContext = redisConnectWithTimeout(hostname, port, timeout);
-
-    if (gRedisContext == NULL || gRedisContext->err)
-    {
-        if (gRedisContext)
-        {
-            printf("Connection Error: %s\n", gRedisContext->errstr);
-            redisFree(gRedisContext);
-            gRedisContext = NULL;
-        }
-        else
-        {
-            printf("Connection error: can't allocate redis context\n");
-        }
-    }
-#endif
-
-    run_identifier();
 
     layer l = net.layers[net.n-1];
     int j;
@@ -466,14 +453,6 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
 
     cvDestroyWindow("Camera");
     cvReleaseCapture(cap);
-
-#ifdef REDIS
-    if (gRedisContext)
-    {
-        redisFree(gRedisContext);
-        gRedisContext = NULL;
-    }
-#endif
 }
 
 

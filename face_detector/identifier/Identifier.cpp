@@ -17,7 +17,7 @@ extern "C" {
 
 VectorClassFinder *pGVCF = NULL;
 
-int run_identifier() {
+int run_identifier(const char* local_server) {
     signal(SIGPIPE, SIG_IGN);
 
     pGVCF = new VectorClassFinder();
@@ -27,7 +27,7 @@ int run_identifier() {
     sleep(1);
 
     // TCP Socket
-    VectorNetSubscriber *vs = new VectorNetSubscriber("10.100.0.53", 55555, pGVCF);
+    VectorNetSubscriber *vs = new VectorNetSubscriber(local_server, 55555, pGVCF);
 
     vs->startThread();
 

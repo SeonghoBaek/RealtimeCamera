@@ -465,12 +465,14 @@ void run_yolo(int argc, char **argv)
     char *cfg = argv[3];
     char *weights = (argc > 4) ? argv[4] : 0;
     char *filename = (argc > 5) ? argv[5]: 0;
+    char *local_server = filename; // For camera
+    char *redis_server = (argc > 6) ? argv[6]: 0;
 
     if(0==strcmp(argv[2], "test")) test_yolo(cfg, weights, filename, thresh);
     else if(0==strcmp(argv[2], "train")) train_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "valid")) validate_yolo(cfg, weights);
     else if(0==strcmp(argv[2], "recall")) validate_yolo_recall(cfg, weights);
-    else if(0==strcmp(argv[2], "camera")) run_camera(cfg, weights, thresh, cam_index, filename, face_class, 1);
+    else if(0==strcmp(argv[2], "camera")) run_camera(cfg, weights, thresh, cam_index, local_server, redis_server, face_class, 1);
     else if(0==strcmp(argv[2], "face")) face_yolo(cfg, weights, filename, thresh, 1);
 #ifdef USE_SRC
     else if(0==strcmp(argv[2], "train_sparse")) train_sparse();

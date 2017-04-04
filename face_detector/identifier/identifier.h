@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-int run_identifier();
+int run_identifier(const char* local_server);
 void clear_label_check_info();
 char* get_label_in_box(int x, int y, int h, int w);
 void version_up();
