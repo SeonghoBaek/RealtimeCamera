@@ -260,6 +260,8 @@ def infer(fileName):
         if person != person_dbn:
             return person, 0
 
+        c = np.array([confidence_dbn, confidence])
+
         if confidence < threshold:
             if confidence > fn_threshold:
                 dist_list = []
@@ -279,13 +281,15 @@ def infer(fileName):
 
                 t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
 
+                c = np.array([confidence_dbn, confidence])
+
                 if t < dist_threashold:
-                    confidence = np.max(confidence_dbn, confidence)
+                    confidence = c.max() # c.min or c.max
                 else:
-                    confidence = fn_threshold
+                    confidence = c.min()
 
         else:
-            confidence = np.max(confidence_dbn, confidence)
+            confidence = c.max()
 
     return person, confidence
 

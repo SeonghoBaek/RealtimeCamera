@@ -141,7 +141,7 @@ def train(args):
     elif args.classifier == 'RadialSvm':  # Radial Basis Function kernel
         print('RadialSvm Classifier')
         # works better with C = 1 and gamma = 2
-        clf = SVC(C=1, kernel='rbf', degree=4, probability=True, gamma=2, decision_function_shape='ovr')
+        clf = SVC(C=1, kernel='rbf', degree=3, probability=True, tol=1e-5, gamma=2, decision_function_shape='ovr')
     elif args.classifier == 'DecisionTree':  # Doesn't work best
         clf = DecisionTreeClassifier(max_depth=20)
     elif args.classifier == 'GaussianNB':

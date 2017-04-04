@@ -22,7 +22,12 @@ label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + 
 label_list.sort()
 print(label_list)
 
-name_list = ['고아라', '서병락', '김대승', '박대영', '김휘영', '노형기', '이현규', '이장형', '김진형', '김기영', '이광희', '남경필', '고민삼', '이상훈', '오세창', '김석원', '백성호', '김성표', '김태희', '김연배', '이유니', '장윤석']
+name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaeseoung': '김 대승', 'KimHwiyoung': '김 휘영',
+             'KimJinhyung': '김 진형', 'KimKeeyoung': '김 기영', 'KimSeokwon': '김 석원', 'KimSeongphyo': '김 성표',
+             'KimTaehee': '김 태희', 'KimYonbe': '김 연배', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
+             'LeeHyungyu': '이 현규', 'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
+             'NamKyungpil': '남 경필', 'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
+             'SeoByungrak': '서 병락', 'Guest': '손님'}
 
 try:
     rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
@@ -48,13 +53,19 @@ def main():
                 data = data.get('data')
 
                 if data > 1L:
-                    #pub.unsubscribe('tts')
-                    index = int(data)
-                    print('received ' + str(index))
+
+                    label = data
 
                     msg = "안녕하세요."
-                    name = name_list[index]
 
+                    name = ''
+
+                    if label[:5] == 'Guest':
+                        name = 'Guest'
+                    else:
+                        name = name_dict[label]
+
+                    print name
                     now = datetime.datetime.now()
 
                     rv = random.randrange(1, 10)
@@ -120,18 +131,15 @@ def main():
                         with open('/tmp/welcome.mp3', 'wb') as f:
                             print("TTS mp3 save")
                             f.write(response_body)
-                            #p = subprocess.Popen(['vlc', '-vvv', '/tmp/welcome.mp3'])
+
                             print('Play tts')
                             p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
                             p.communicate()
                             print('Play done')
-                            #time.sleep(4)
-                            #p.terminate()
+
 
                     else:
                         print("Error Code:" + rescode)
-
-                    #pub.subscribe('tts')
 
     except:
         print('Error')
