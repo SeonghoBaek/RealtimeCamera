@@ -20,7 +20,7 @@ import numpy as np
 
 threshold = 0.9
 fn_threshold = 0.7
-dist_threashold = 0.2
+alpha = 1.96 # 90 %: 1.64
 show_time = False
 debug = False
 info = True
@@ -40,8 +40,9 @@ label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + 
 label_list.sort()
 print(label_list)
 
-g_dist_list = {}
+g_dist_min_list = {}
 g_dist_mean_list = {}
+g_std_list = {}
 g_embedding_list = {}
 
 HOST, PORT = "10.100.0.53", 55555
@@ -277,16 +278,40 @@ def infer(fileName):
                 m = np.mean(dist_list)
                 #m = np.max(dist_list)
 
-                print m - g_dist_list[person], m - g_dist_mean_list[person]
+                confidence_interval = g_std_list[person]
 
-                t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
+                thd = g_dist_mean_list[person] + confidence_interval
+
+                print m, thd, confidence_interval
 
                 c = np.array([confidence_dbn, confidence])
 
-                if t < dist_threashold:
-                    confidence = c.max() # c.min or c.max
+                if m < thd:
+                    confidence = c.max()  # c.min or c.max
                 else:
                     confidence = c.min()
+
+
+                #thd = g_dist_list[person] + alpha * g_dist_mean_list[person]
+
+                #c = np.array([confidence_dbn, confidence])
+
+                #if m < thd:  # D < min + alpha x Mean
+                #    confidence = c.max()  # c.min or c.max
+                #else:
+                #    confidence = c.min()
+
+                #print m - g_dist_list[person], m - g_dist_mean_list[person], g_dist_list[person]
+
+                #t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
+
+                #c = np.array([confidence_dbn, confidence])
+
+                #if t < g_dist_list[person]: # D < min + 0.5 x Mean
+                #if t < dist_threashold:
+                #    confidence = c.max() # c.min or c.max
+                #else:
+                #    confidence = c.min()
 
         else:
             confidence = c.max()
@@ -369,8 +394,9 @@ def create_rep_distance_list():
 
     first_label = labels[0]
 
-    total_means = []
-    temp_means = []
+    min_means = []
+    mean_means = []
+    class_std = []
     class_labels = []
     classes = []
 
@@ -407,20 +433,25 @@ def create_rep_distance_list():
                 dst = distance.euclidean(embedding_list[c][i], embedding_list[c][p])
                 dist_list.append(dst)
 
-
             m = np.mean(dist_list)
+
             class_mean.append(m)
 
         mm = np.mean(class_mean)
         m = np.min(class_mean)
-        total_means.append(m)
-        temp_means.append(mm)
+        s = np.std(class_mean)
+        min_means.append(m)
+        mean_means.append(mm)
+        class_std.append(s)
 
-        print class_labels[c][0], m
+        #print class_labels[c][0], mm, s
 
     for c in range(len(class_labels)):
-        g_dist_list[class_labels[c][0]] = total_means[c]
-        g_dist_mean_list[class_labels[c][0]] = temp_means[c]
+        g_dist_min_list[class_labels[c][0]] = min_means[c]
+        g_dist_mean_list[class_labels[c][0]] = mean_means[c]
+        #g_std_list[class_labels[c][0]] = class_std[c]
+        g_std_list[class_labels[c][0]] = alpha * class_std[c] / np.sqrt(len(class_labels[c]))
+        print class_labels[c][0], len(class_labels[c]), g_std_list[class_labels[c][0]], g_dist_mean_list[class_labels[c][0]], g_dist_min_list[class_labels[c][0]]
 
     for c in range(len(class_labels)):
         g_embedding_list[class_labels[c][0]] = embedding_list[c]
@@ -498,8 +529,8 @@ def main():
                             if confidence < threshold:
                                dirname = save_unknown_user(fileName, dirname)
 
-                            person = "Unknown"
-                            confidence = 0.0
+                            #person = "Unknown"
+                            #confidence = 0.0
 
                         else:
                             #info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
@@ -528,8 +559,8 @@ def main():
                                 if confidence < threshold:
                                     dirname = save_unknown_user(fileName, dirname)
 
-                                confidence = 0.0
-                                person = "Unknown"
+                                #confidence = 0.0
+                                #person = "Unknown"
 
                             else:
                                 #info_print("{} : {:.2f} %".format(person, 100 * confidence))

@@ -9,6 +9,8 @@ import time
 import datetime
 import subprocess
 import random
+import pygst
+from gtts import gTTS
 
 HOST, PORT = "10.100.1.150", 6379
 client_id = "m59KXbFvFqBB5aaTvZea"
@@ -113,34 +115,45 @@ def main():
                     else:
                         sentence = '퇴근하세요'
 
+                    voice = random.randrange(1, 10)
+
                     msg = msg + name + '님 ' + sentence
 
-                    encText = urllib2.quote(msg)
-                    data = "speaker=mijin&speed=0&text=" + encText
-                    url = "https://openapi.naver.com/v1/voice/tts.bin"
-                    request = urllib2.Request(url)
+                    if voice < 6:
+                        tts = gTTS(text=msg, lang='ko')
+                        tts.save('/tmp/welcome.mp3')
 
-                    request.add_header("X-Naver-Client-Id",client_id)
-                    request.add_header("X-Naver-Client-Secret",client_secret)
-                    response = urllib2.urlopen(request, data=data.encode('utf-8'))
-                    rescode = response.getcode()
-
-                    if rescode == 200:
-                        response_body = response.read()
-
-                        with open('/tmp/welcome.mp3', 'wb') as f:
-                            print("TTS mp3 save")
-                            f.write(response_body)
-
-                            print('Play tts')
-                            p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
-                            p.communicate()
-                            print('Play done')
-
+                        print('Play tts')
+                        p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
+                        p.communicate()
+                        print('Play done')
 
                     else:
-                        print("Error Code:" + rescode)
+                        encText = urllib2.quote(msg)
+                        data = "speaker=mijin&speed=0&text=" + encText
+                        url = "https://openapi.naver.com/v1/voice/tts.bin"
+                        request = urllib2.Request(url)
 
+                        request.add_header("X-Naver-Client-Id", client_id)
+                        request.add_header("X-Naver-Client-Secret", client_secret)
+                        response = urllib2.urlopen(request, data=data.encode('utf-8'))
+                        rescode = response.getcode()
+
+                        if rescode == 200:
+                            response_body = response.read()
+
+                            with open('/tmp/welcome.mp3', 'wb') as f:
+                                print("TTS mp3 save")
+                                f.write(response_body)
+
+                                print('Play tts')
+                                p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
+                                p.communicate()
+                                print('Play done')
+
+
+                        else:
+                            print("Error Code:" + rescode)
     except:
         print('Error')
 

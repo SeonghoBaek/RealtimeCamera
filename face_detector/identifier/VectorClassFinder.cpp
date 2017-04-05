@@ -16,7 +16,7 @@
 #define USE_ROBOT 1
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
-#define USE_TRACKING 0
+#define USE_TRACKING 1
 #define LABEL_VERSION_DIFF 30
 
 #if (IOU_SINGLE_MODE == 1)
@@ -269,7 +269,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
     if (max_iou_index == -1)
     {
-        return "Guest";
+        return "";
     }
     else
     {
@@ -431,10 +431,8 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
 
             if (gTTSRedisContext)
             {
-                char id[3];
-                sprintf(id, "%d", labelIndex);
-
-                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
+                char *name = this->mpLabels[labelIndex].getLabel();
+                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
             }
         }
     }
@@ -442,10 +440,8 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
     {
         if (gTTSRedisContext)
         {
-            char id[3];
-            sprintf(id, "%d", labelIndex);
-
-            redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
+            char *name = this->mpLabels[labelIndex].getLabel();
+            redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
         }
     }
 
@@ -482,6 +478,10 @@ int VectorClassFinder::addNewFace(Vector *pV)
     this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE);
     this->mpLabels[pV->mLabelIndex].setY(1);
     this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+    this->mpLabels[pV->mLabelIndex].mLeft = pV->mX;
+    this->mpLabels[pV->mLabelIndex].mRight = pV->mY;
+    this->mpLabels[pV->mLabelIndex].mTop = pV->mT;
+    this->mpLabels[pV->mLabelIndex].mBottom = pV->mB;
 
     this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
 
