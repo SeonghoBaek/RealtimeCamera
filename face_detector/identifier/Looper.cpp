@@ -197,4 +197,3 @@ int Looper::sendMessage(const char* msg, int length)
 {
     return (int)write(this->mFd[1], msg, length);
 }
-

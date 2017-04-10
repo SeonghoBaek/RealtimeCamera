@@ -294,6 +294,8 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                     box_image = resized_image;
                 }
 
+                saturate_exposure_image(box_image, 1.2, 1.2);
+
                 // Save jpg file to temp.
                 save_image(box_image, filename);
 
@@ -362,10 +364,12 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 }
 #endif
 
-                //printf("draw label\n");
-                image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
+                if (strlen(strlabel) > 1)
+                {
+                    image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
 
-                draw_label(im, padded_top + width, padded_left, label, gBoxRGB);
+                    draw_label(im, padded_top + width, padded_left, label, gBoxRGB);
+                }
             }
         }
 
@@ -446,6 +450,8 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
                 free_image(box_image);
                 box_image = resized_image;
             }
+
+            saturate_exposure_image(box_image, 1.2, 1.2);
 
             save_image(box_image, filename);
             free_image(box_image);

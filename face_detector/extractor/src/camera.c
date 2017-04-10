@@ -170,7 +170,7 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
     printf("Start Camera Capture \n");
 
-    cap = cvCaptureFromCAM(cam_index);
+    cap = cvCaptureFromCAM(CV_CAP_ANY);
 
     if (!cap) {
         error("Couldn't connect to webcam.\n");
@@ -241,20 +241,21 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
 #ifdef SHOW_WINDOW
         show_image(disp, "Camera");
-#endif
 
         int c = cvWaitKey(delay);
+#endif
 
         pthread_join(fetch_thread, 0);
         pthread_join(detect_thread, 0);
 
+#ifdef SHOW_WINDOW
         if (c == 10)
         {
             delay += 10;
 
             if (delay > 40) delay = 1;
         }
-
+#endif
 
         free_image(disp);
         disp = det;

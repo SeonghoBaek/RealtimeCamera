@@ -9,7 +9,6 @@ import time
 import datetime
 import subprocess
 import random
-import pygst
 from gtts import gTTS
 
 HOST, PORT = "10.100.1.150", 6379
@@ -24,7 +23,7 @@ label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + 
 label_list.sort()
 print(label_list)
 
-name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaeseoung': '김 대승', 'KimHwiyoung': '김 휘영',
+name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaeseoung': '김 대승', 'KimMina': '김 미나', 'KimHwiyoung': '김 휘영',
              'KimJinhyung': '김 진형', 'KimKeeyoung': '김 기영', 'KimSeokwon': '김 석원', 'KimSeongphyo': '김 성표',
              'KimTaehee': '김 태희', 'KimYonbe': '김 연배', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
              'LeeHyungyu': '이 현규', 'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
@@ -32,7 +31,8 @@ name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaes
              'SeoByungrak': '서 병락', 'Guest': '손님'}
 
 try:
-    rds = redis.StrictRedis(host=HOST,port=PORT,db=0)
+    rds = redis.StrictRedis(host=HOST, port=PORT, db=0)
+
     pub = rds.pubsub()
     pub.subscribe('tts')
     redis_ready = True
@@ -63,11 +63,16 @@ def main():
                     name = ''
 
                     if label[:5] == 'Guest':
-                        name = 'Guest'
+                        name = name_dict['Guest']
                     else:
-                        name = name_dict[label]
+                        if label == 'default':
+                            name = ''
+                        else:
+                            name = name_dict[label]
+                            name = name + '님 '
 
                     print name
+
                     now = datetime.datetime.now()
 
                     rv = random.randrange(1, 10)
@@ -117,11 +122,13 @@ def main():
 
                     voice = random.randrange(1, 10)
 
-                    msg = msg + name + '님 ' + sentence
+                    msg = msg + name + sentence
 
                     if voice < 6:
                         tts = gTTS(text=msg, lang='ko')
                         tts.save('/tmp/welcome.mp3')
+
+                        time.sleep(2);
 
                         print('Play tts')
                         p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
@@ -146,6 +153,7 @@ def main():
                                 print("TTS mp3 save")
                                 f.write(response_body)
 
+                                time.sleep(2);
                                 print('Play tts')
                                 p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
                                 p.communicate()

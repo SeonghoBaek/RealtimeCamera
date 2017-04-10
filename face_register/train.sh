@@ -1,4 +1,5 @@
 #!/bin/bash
+. /home/airi/distro/install/bin/torch-activate
 
 echo Align face image..Wait
 rm -rf output

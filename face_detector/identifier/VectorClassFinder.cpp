@@ -8,11 +8,11 @@
 #include <hiredis.h>
 #include "../sparse/sparse.h"
 
-#define RESET_FREQ 30
+#define RESET_FREQ 120
 #define USE_UPDATE_CHECK 0
 #define USE_LINED_LIST 1
 #define IOU_SINGLE_MODE 0
-#define BRIDGE_INTERVAL 5 // 5 Sec.
+#define BRIDGE_INTERVAL 6 // Sec.
 #define USE_ROBOT 1
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -142,11 +142,13 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     LOGD("Invalidate: %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
                 }
 
+                /*
                 if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
                 {
                     LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
                     tooOld = 1;
                 }
+                */
 
                 if (invalidate == 1 || tooOld == 1)
                 {
@@ -427,7 +429,7 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
         if (this->sendToBridge("robot_bridge", (void *)"open", 4) == 0)
         {
             // Successful open.
-            this->mVersion = 0; // Reset.
+            //this->mVersion = 0; // Reset.
 
             if (gTTSRedisContext)
             {
@@ -528,8 +530,31 @@ int VectorClassFinder::looperCallback(const char *event) {
 
     LOCK(this->mFrameLock)
     {
+        if (pV->mConfidence < 0.9)
+        {
+            LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
+
+            this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+
+            /*
+            if (this->mpActiveLabelList == NULL)
+            {
+                if (gTTSRedisContext)
+                {
+                    char *name = "default";
+                    redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
+                }
+            }
+            */
+
+            delete pV;
+
+            return 0;
+        }
+
         if (this->mpActiveLabelList == NULL)
         {
+            /*
             if (pV->mConfidence < 0.9)
             {
                 LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
@@ -540,6 +565,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                 return 0;
             }
+            */
 
             int labelState = this->mpLabels[pV->mLabelIndex].getX();
 
@@ -602,15 +628,12 @@ int VectorClassFinder::looperCallback(const char *event) {
 
             if (labelState == LABEL_VALID_STATE)
             {
-#if (USE_TRACKING == 0)
-                // If not support tracking
                 if (pV->mConfidence < 0.9)
                 {
                     this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
                     this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
                 }
                 else
-#endif
                 {
                     this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE); // For explicit action
                     this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
@@ -634,6 +657,7 @@ int VectorClassFinder::looperCallback(const char *event) {
             }
             else if (labelState < LABEL_READY_STATE)
             {
+                /*
                 if (pV->mConfidence < 0.9)
                 {
                     LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
@@ -643,6 +667,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                     delete pV;
                     return 0;
                 }
+                */
 
                 LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
 
@@ -666,6 +691,7 @@ int VectorClassFinder::looperCallback(const char *event) {
             }
             else if (labelState == LABEL_READY_STATE)// -1
             {
+                /*
                 int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
 
                 if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
@@ -677,7 +703,9 @@ int VectorClassFinder::looperCallback(const char *event) {
                     delete pV;
                     return 0;
                 }
+                */
 
+                /*
                 if (pV->mConfidence < 0.9)
                 {
                     this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
@@ -686,6 +714,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                     delete pV;
                     return 0;
                 }
+                */
 
                 // Simple Approach
 
@@ -915,6 +944,25 @@ int VectorClassFinder::looperCallback(const char *event) {
 #endif
 
     delete pV;
+
+    return 0;
+}
+
+int VectorClassFinder::timerCallback(const char *event)
+{
+    LOCK(this->mFrameLock)
+    {
+        LOGD("Reset Timer Callback!\n");
+        //this->mVersion = 0; // Reset.
+        LabelListItem *pItem = this->mpActiveLabelList;
+
+        while (pItem != NULL)
+        {
+            this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+
+            pItem = pItem->mpNext;
+        }
+    }
 
     return 0;
 }

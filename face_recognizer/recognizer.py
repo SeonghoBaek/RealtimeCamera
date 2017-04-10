@@ -20,7 +20,7 @@ import numpy as np
 
 threshold = 0.9
 fn_threshold = 0.7
-alpha = 1.96 # 90 %: 1.64
+alpha = 1.64  #95%: 1.96, 90 %: 1.64
 show_time = False
 debug = False
 info = True
@@ -45,7 +45,8 @@ g_dist_mean_list = {}
 g_std_list = {}
 g_embedding_list = {}
 
-HOST, PORT = "10.100.0.53", 55555
+HOST, PORT = "10.100.1.152", 55555
+#HOST, PORT = "10.100.0.53", 55555
 REDIS_SERVER = '10.100.1.150'
 REDIS_PORT = 6379
 parser = argparse.ArgumentParser()
@@ -79,6 +80,7 @@ def info_print(str):
 
 try:
     rds = redis.StrictRedis(host=REDIS_SERVER,port=REDIS_PORT,db=0)
+
     p = rds.pubsub()
     p.subscribe('camera')
     redis_ready = True
@@ -314,7 +316,10 @@ def infer(fileName):
                 #    confidence = c.min()
 
         else:
-            confidence = c.max()
+            if confidence_dbn >= threshold:
+                confidence = c.max()
+            else:
+                confidence = confidence_dbn
 
     return person, confidence
 
@@ -526,6 +531,8 @@ def main():
                         if confidence < threshold:
                             info_print("Who are you?: " + person + '(' + str(int(100*confidence)) + '%)')
 
+                            #rds.publish('tts', 'default')
+
                             if confidence < threshold:
                                dirname = save_unknown_user(fileName, dirname)
 
@@ -536,6 +543,7 @@ def main():
                             #info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
                             info_print("{} : {} %".format(person, int(100 * confidence)))
 
+                        if confidence > 0:
                             if sock_ready is True:
                                 b_array = bytes()
                                 floatList = [left, right, top, bottom, confidence, label_list.index(person)]
@@ -566,6 +574,7 @@ def main():
                                 #info_print("{} : {:.2f} %".format(person, 100 * confidence))
                                 info_print("{} : {} %".format(person, int(100 * confidence)))
 
+                            if confidence > 0:
                                 if sock_ready is True:
                                     b_array = bytes()
                                     floatList = [left, right, top, bottom, confidence, label_list.index(person)]

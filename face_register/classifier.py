@@ -39,6 +39,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.lda import LDA
 from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC
+from sklearn.svm import NuSVC
 from sklearn.grid_search import GridSearchCV
 from sklearn.mixture import GMM
 from sklearn.tree import DecisionTreeClassifier
@@ -141,7 +142,7 @@ def train(args):
     elif args.classifier == 'RadialSvm':  # Radial Basis Function kernel
         print('RadialSvm Classifier')
         # works better with C = 1 and gamma = 2
-        clf = SVC(C=1, kernel='rbf', degree=3, probability=True, tol=1e-5, gamma=2, decision_function_shape='ovr')
+        clf = SVC(C=1.5, kernel='rbf', degree=3, probability=True, tol=1e-5, gamma=3, decision_function_shape='ovr')
     elif args.classifier == 'DecisionTree':  # Doesn't work best
         clf = DecisionTreeClassifier(max_depth=20)
     elif args.classifier == 'GaussianNB':
@@ -164,15 +165,16 @@ def train(args):
                   # will be randomly dropped as a decimal.
         #          verbose=1)
 
-        clf = DBN([-1, 256, 256, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
+        clf = DBN([-1, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
+                  learn_rates_pretrain=0.005,
                   # Smaller steps mean a possibly more accurate result, but the
                   # training will take longer
-                  learn_rate_decays=0.9,
+                  #learn_rate_decays=0.9,
                   # a factor the initial learning rate will be multiplied by
                   # after each iteration of the training
-                  epochs=256,  # no of iternation
-                  # dropouts = 0.25, # Express the percentage of nodes that
+                  epochs=80,  # no of iternation
+                  dropouts=0.25, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
                   verbose=1)
     if args.ldaDim > 0:

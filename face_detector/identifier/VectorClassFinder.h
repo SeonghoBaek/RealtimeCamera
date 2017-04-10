@@ -126,7 +126,7 @@ public:
     }
 };
 
-class VectorClassFinder:public IVectorNotifier, public Thread, public ILooper
+class VectorClassFinder:public IVectorNotifier, public Thread, public ILooper, public ITimer
 {
 private:
     VectorQueue     mVQ;
@@ -140,6 +140,7 @@ private:
     LabelListItem   *mpActiveLabelList;
     unsigned int    mVersion;
     double          mLastBridgeSendTime;
+    Timer           *mpTimer;
 
     float       getDistance(int sx, int sy, int tx, int ty);
     float       getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom);
@@ -163,6 +164,9 @@ public:
         mpLabels = NULL;
         mVersion = 0;
         mLastBridgeSendTime = 0;
+        mpTimer = new Timer();
+
+        this->mpTimer->setTimer(this, 3000);
     }
 
     virtual ~VectorClassFinder()
@@ -323,6 +327,8 @@ public:
     }
 
     void run();
+
+    int timerCallback(const char *event) override;
 };
 
 #endif //REALTIMECAMERA_VECTORCLASSFINDER_H
