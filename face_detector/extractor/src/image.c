@@ -258,7 +258,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             //int center_y = (top + bot) / 2;
             int padding = (right - left) / 10; // 10 % width.
 
-            //padding = 0;
+            padding = 0; // no padding
             //printf("center: %d, %d\n", center_x, center_y);
 
             // Extend
@@ -289,12 +289,16 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                     float height = padded_bot - padded_top;
                     float factor = 128 / height;
 
-                    resized_image = resize_image(box_image, factor*(padded_right - padded_left), factor*(padded_bot - padded_top));
-                    free_image(box_image);
-                    box_image = resized_image;
+                    if (padding)
+                    {
+                        resized_image = resize_image(box_image, factor * (padded_right - padded_left),
+                                                     factor * (padded_bot - padded_top));
+                        free_image(box_image);
+                        box_image = resized_image;
+                    }
                 }
 
-                saturate_exposure_image(box_image, 1.2, 1.2);
+                //saturate_exposure_image(box_image, 1.2, 1.2);
 
                 // Save jpg file to temp.
                 save_image(box_image, filename);

@@ -7,6 +7,9 @@
 #include <math.h>
 #include <hiredis.h>
 #include "../sparse/sparse.h"
+#include <ctime>
+
+using namespace std;
 
 #define RESET_FREQ 120
 #define USE_UPDATE_CHECK 0
@@ -426,7 +429,20 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
 {
     if (gSupportRobot)
     {
-        if (this->sendToBridge("robot_bridge", (void *)"open", 4) == 0)
+        time_t curr_time;
+        struct tm *curr_tm;
+
+        curr_time = time(NULL);
+        curr_tm = localtime(&curr_time);
+
+        if (curr_tm->tm_hour < 7 || curr_tm->tm_hour > 19)
+        {
+            LOGI("Do not open door for sequrity\n");
+
+            return 0;
+        }
+
+        if (this->sendToBridge("/var/tmp/robot_bridge", (void *)"open", 4) == 0)
         {
             // Successful open.
             //this->mVersion = 0; // Reset.

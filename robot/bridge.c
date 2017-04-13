@@ -167,8 +167,6 @@ static int bridge_thread(const char* domain_name, void (*action)(void *, int))
     char buffer[BUFFER_SIZE];
     int __exit = 0;
 
-    printf("%d\n", __LINE__);
-
     if ((localSocket = bridge_createSocket()) < 0)
     {
         printf("Local Socket Creation Error\n");
@@ -176,16 +174,12 @@ static int bridge_thread(const char* domain_name, void (*action)(void *, int))
         return -1;
     }
 
-    printf("%d\n", __LINE__);
-
     if (bridge_bindLocalSocketToName(localSocket, domain_name) < 0)
     {
         close(localSocket);
 
         return -1;
     }
-
-    printf("%d\n", __LINE__);
 
     if (listen(localSocket, 4) < 0)
     {
@@ -227,11 +221,8 @@ static void* __thread_func(void *data)
 {
     bridge_arg *t = (bridge_arg *)data;
 
-    printf("%d\n", __LINE__);
-
     bridge_thread(t->name, t->cb);
 
-    printf("%d\n", __LINE__);
     return NULL;
 }
 
@@ -240,22 +231,16 @@ int bridge_create(char* my_name, void (*action)(void *, int))
     pthread_t tid;
     bridge_arg* arg;
 
-    printf("%d\n", __LINE__);
-
     arg = (bridge_arg *)malloc(sizeof(bridge_arg));
 
     arg->name = my_name;
     arg->cb = action;
-
-    printf("%d\n", __LINE__);
 
     if (pthread_create(&tid, NULL, __thread_func, arg) == 0)
     {
         printf("TID: %d\n", tid);
         pthread_detach(tid);
     }
-
-    printf("%d\n", __LINE__);
 
     return tid;
 }

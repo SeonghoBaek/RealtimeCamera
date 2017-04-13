@@ -5,13 +5,30 @@
 #include <string.h>
 #include <poll.h>
 #include "bridge.h"
-#import <stdio.h>
+#include <stdio.h>
+#include <time.h>
 
 int uart_fd = -1;
 
 void callback(void *cmd, int length)
 {
     const char *str = "123\n";
+    struct tm *t;
+    time_t timer;
+
+    time(&timer);
+    t = localtime(&timer);
+
+    printf("Current hour: %d\n", t->tm_hour);
+
+    if (t->tm_hour < 7 || t->tm_hour > 19)
+    {
+        printf("For security, Do not operatate robot arms\n");
+        return;
+    }
+
+    sleep(1);
+
     write(uart_fd, str, strlen(str)+1);
 
     return;
@@ -56,9 +73,9 @@ int main(void)
 
     uart_fd = fd;
 
-    printf("%d\n", __LINE__);
+    //printf("%d\n", __LINE__);
 
-    bridge_create("robot_bridge", callback);
+    bridge_create("/var/tmp/robot_bridge", callback);
 
     //write(fd, str, strlen(str)+1);
 

@@ -19,12 +19,13 @@ from operator import itemgetter
 import numpy as np
 
 threshold = 0.9
-fn_threshold = 0.7
+fn_threshold = 0.8
 alpha = 1.64  #95%: 1.96, 90 %: 1.64
 show_time = False
 debug = False
 info = True
 save_representation = False
+use_face_align = True
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 # Modify baseDir to your environment
@@ -114,6 +115,15 @@ def getRep(imgPath, multiple=False):
 
     rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
 
+    #for test
+    if use_face_align is False:
+        rgbImg = cv2.resize(rgbImg, (96, 96))
+        rep = net.forward(rgbImg)
+        rep = np.asarray(rep)
+        reps = []
+        reps.append(rep)
+        return reps
+
     #rgbImg = cv2.resize(rgbImg, (0,0), fx=2.0, fy=2.0)
 
     if show_time is True:
@@ -152,11 +162,8 @@ def getRep(imgPath, multiple=False):
         if show_time is True:
             start = time.time()
 
-        alignedFace = align.align(
-            args.imgDim,
-            rgbImg,
-            bb,
-            landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
+       #alignedFace = align.align(args.imgDim, rgbImg, bb,landmarkIndices=openface.AlignDlib.OUTER_EYES_AND_NOSE)
+        alignedFace = align.align(args.imgDim, rgbImg, bb, landmarkIndices=openface.AlignDlib.INNER_EYES_AND_BOTTOM_LIP)
 
         if alignedFace is None:
             raise Exception("Unable to align image: {}".format(imgPath))
@@ -177,6 +184,7 @@ def getRep(imgPath, multiple=False):
         reps.append((bb.center().x, rep))
 
     sreps = sorted(reps, key=lambda x: x[0])
+
     return sreps
 
 
@@ -223,103 +231,114 @@ def getL2Difference(vec1, vec2):
 
 
 def infer(fileName):
-    reps = getRep(fileName, False)
+    represent = getRep(fileName, False)
     confidence = 0.0
 
-    if not reps:
+    if not represent:
         ##debug_print("Who are you?")
         return 'Unknown', confidence
 
-    if len(reps) > 1:
-        debug_print("List of faces in image from left to right")
-
-    for r in reps:
+    #for test
+    if use_face_align is False:
+        r = represent[0]
+        rep = r.reshape(1, -1)
+    else:
+        r = represent[0]
         rep = r[1].reshape(1, -1)
         bbx = r[0]
 
-        if save_representation is True:
-            save_rep(fileName, rep)
+    if save_representation is True:
+        save_rep(fileName, rep)
 
-        if show_time is True:
-            start = time.time()
+    if show_time is True:
+        start = time.time()
 
-        predictions = clf.predict_proba(rep).ravel()
-        pred_dbn = clf_dbn.predict_proba(rep).ravel()
+    predictions = clf.predict_proba(rep).ravel()
+    pred_dbn = clf_dbn.predict_proba(rep).ravel()
 
-        maxI = np.argmax(predictions)
-        person = le.inverse_transform(maxI)
-        confidence = predictions[maxI]
+    maxI = np.argmax(predictions)
+    person = le.inverse_transform(maxI)
+    confidence = predictions[maxI]
 
-        maxI = np.argmax(pred_dbn)
-        person_dbn = le_dbn.inverse_transform(maxI)
-        confidence_dbn = pred_dbn[maxI]
+    maxI = np.argmax(pred_dbn)
+    person_dbn = le_dbn.inverse_transform(maxI)
+    confidence_dbn = pred_dbn[maxI]
 
-        if show_time is True:
-            debug_print("Prediction took {} seconds.".format(time.time() - start))
+    if show_time is True:
+        debug_print("Prediction took {} seconds.".format(time.time() - start))
 
-        print "DBN: ", person_dbn, confidence_dbn
-        print "SVM: ", person, confidence
+    print "DBN: ", person_dbn, confidence_dbn
+    print "SVM: ", person, confidence
 
-        if person != person_dbn:
-            return person, 0
+    if person != person_dbn:
+        return person, 0
 
-        c = np.array([confidence_dbn, confidence])
+    c = np.array([confidence_dbn, confidence])
 
-        if confidence < threshold:
-            if confidence > fn_threshold:
-                dist_list = []
+    avgt = np.mean([confidence_dbn, confidence])
 
-                print person, confidence
+    print 'AVG: ', avgt
 
-                sz = len(g_embedding_list[person])
+    if avgt < threshold:
+        #if confidence > fn_threshold:
+        if avgt > fn_threshold:
+            dist_list = []
 
-                for i in range(sz):
-                    dst = distance.euclidean(g_embedding_list[person][i], rep)
-                    dist_list.append(dst)
+            print person, confidence
 
-                m = np.mean(dist_list)
-                #m = np.max(dist_list)
+            sz = len(g_embedding_list[person])
 
-                confidence_interval = g_std_list[person]
+            for i in range(sz):
+                dst = distance.euclidean(g_embedding_list[person][i], rep)
+                dist_list.append(dst)
 
-                thd = g_dist_mean_list[person] + confidence_interval
+            m = np.mean(dist_list)
+            #m = np.max(dist_list)
 
-                print m, thd, confidence_interval
+            confidence_interval = g_std_list[person]
 
-                c = np.array([confidence_dbn, confidence])
+            thd = g_dist_mean_list[person] + confidence_interval
 
-                if m < thd:
-                    confidence = c.max()  # c.min or c.max
-                else:
-                    confidence = c.min()
+            print m, thd, confidence_interval
 
+            c = np.array([confidence_dbn, confidence])
 
-                #thd = g_dist_list[person] + alpha * g_dist_mean_list[person]
-
-                #c = np.array([confidence_dbn, confidence])
-
-                #if m < thd:  # D < min + alpha x Mean
-                #    confidence = c.max()  # c.min or c.max
-                #else:
-                #    confidence = c.min()
-
-                #print m - g_dist_list[person], m - g_dist_mean_list[person], g_dist_list[person]
-
-                #t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
-
-                #c = np.array([confidence_dbn, confidence])
-
-                #if t < g_dist_list[person]: # D < min + 0.5 x Mean
-                #if t < dist_threashold:
-                #    confidence = c.max() # c.min or c.max
-                #else:
-                #    confidence = c.min()
-
-        else:
-            if confidence_dbn >= threshold:
-                confidence = c.max()
+            if m < thd:
+                confidence = c.max()  # c.min or c.max
             else:
-                confidence = confidence_dbn
+                confidence = c.min()
+
+
+            #thd = g_dist_list[person] + alpha * g_dist_mean_list[person]
+
+            #c = np.array([confidence_dbn, confidence])
+
+            #if m < thd:  # D < min + alpha x Mean
+            #    confidence = c.max()  # c.min or c.max
+            #else:
+            #    confidence = c.min()
+
+            #print m - g_dist_list[person], m - g_dist_mean_list[person], g_dist_list[person]
+
+            #t = (m - g_dist_list[person]) + (m - g_dist_mean_list[person])
+
+            #c = np.array([confidence_dbn, confidence])
+
+            #if t < g_dist_list[person]: # D < min + 0.5 x Mean
+            #if t < dist_threashold:
+            #    confidence = c.max() # c.min or c.max
+            #else:
+            #    confidence = c.min()
+
+    else:
+        #if confidence_dbn >= threshold:
+        #    confidence = c.max()
+        #else:
+        #    confidence = confidence_dbn
+        confidence = avgt
+
+    if 'nobody' in person:
+        confidence = 0
 
     return person, confidence
 

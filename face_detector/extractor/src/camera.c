@@ -239,6 +239,11 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
         if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
         if (pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
+        if (gFrameNum % 30 == 0)
+        {
+            save_image(disp, "../robot/node/public/screenshot");
+        }
+
 #ifdef SHOW_WINDOW
         show_image(disp, "Camera");
 

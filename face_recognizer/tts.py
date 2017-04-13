@@ -30,6 +30,24 @@ name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaes
              'NamKyungpil': '남 경필', 'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
              'SeoByungrak': '서 병락', 'Guest': '손님'}
 
+
+sentences_A = ['좋은 아침이에요', '커피 한 잔 하세요', '좋은 하루 되세요', '더 웃으세요', '들어와요', '화이팅!', '멋지시네요',
+               '즐거운 하루 되세요', '조용한 물이 깊이 흐릅니다.', '지혜는 고통속에 있습니다.', '힘 찬 하루 되세요', '굿모닝', '반가워요', '어서오세요', '옷이 비싸보이네요', '제 이름은 뭘까요?',
+               '어서와요', '요즘 책 좀 보시나요?', '어떤 조언도 길게 하지는 마세요', '배움은 재산이랍니다.', '오 멋져요', '보고싶었어요', '사랑해요', '동안이네요']
+
+sentences_B = ['산뜻한 오후 보내세요', '화이팅 하세요', '운동 좀 하세요', '힘드시죠? 힘내세요', '당신은 자랑스러운 사람입니다',
+               '즐거운 하루되세요', '아이리 만세', '조금만 더 힘내세요', '잠오면 세수하세요', '어서와요', '반가워요', '오셨어요?',
+               '오늘은 무엇을 배웠나요', '시간과 싸우세요', '오늘은 돌아오지 않는답니다.', '할 수 있다고 믿으면 할 수 있습니다.', '말은 마음의 초상입니다.',
+               '긍정적인 마인드']
+
+sentences_C = ['점심 드셨나요', '어서와요', '스마일', '오셨어요?', '멋집니다']
+
+sentences_D = ['곧 즐거운 퇴근이에요']
+
+sentences_E = ['어서 퇴근하셔야죠']
+
+sentences_F = []
+
 try:
     rds = redis.StrictRedis(host=HOST, port=PORT, db=0)
 
@@ -75,60 +93,31 @@ def main():
 
                     now = datetime.datetime.now()
 
-                    rv = random.randrange(1, 10)
+                    if now.hour < 12:
+                        rv = random.randrange(0, len(sentences_A))
 
-                    if now.hour < 11:
-                        if rv == 1:
-                            sentence = '좋은 아침이에요'
-                        elif rv == 2:
-                            sentence = '커피 한 잔 하세요'
-                        elif rv == 3:
-                            sentence = '좋은 하루되세요'
-                        elif rv == 4:
-                            sentence = '날씨가 좋네요'
-                        elif rv == 5:
-                            sentence = '너무 춥네요'
-                        elif rv == 6:
-                            sentence = '화이팅'
-                        elif rv == 7:
-                            sentence = '멋지네요'
-                        elif rv == 8:
-                            sentence = '즐거운 하루'
-                        else:
-                            sentence = '힘찬 하루'
-                    elif now.hour < 12:
-                        sentence = '즐거운 점심'
-                    elif now.hour < 17:
-                        if rv == 1:
-                            sentence = '좋은 오후 보내세요'
-                        elif rv == 2:
-                            sentence = '커피 한 잔 하세요'
-                        elif rv == 3:
-                            sentence = '운동 좀 하세요'
-                        elif rv == 4:
-                            sentence = '날씨가 좋네요'
-                        elif rv == 5:
-                            sentence = '너무 춥네요'
-                        elif rv == 6:
-                            sentence = '감기 조심하세요'
-                        elif rv == 7:
-                            sentence = '산책 어떠세요'
-                        elif rv == 8:
-                            sentence = '쉬엄쉬엄 하세요'
-                        else:
-                            sentence = '졸지마세요'
+                        sentence = sentences_A[rv]
+                    elif now.hour < 13:
+                        rv = random.randrange(0, len(sentences_C))
+
+                        sentence = sentences_C[rv]
+                    elif now.hour < 18:
+                        rv = random.randrange(0, len(sentences_B))
+
+                        sentence = sentences_B[rv]
                     else:
-                        sentence = '퇴근하세요'
+                        sentence = '어서 퇴근하셔야죠'
 
                     voice = random.randrange(1, 10)
 
-                    msg = msg + name + sentence
+                    msg = name + ', ' + sentence
+                    #msg = msg + ' ' + sentence
 
                     if voice < 6:
                         tts = gTTS(text=msg, lang='ko')
                         tts.save('/tmp/welcome.mp3')
 
-                        time.sleep(2);
+                        #time.sleep(2);
 
                         print('Play tts')
                         p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
@@ -153,7 +142,7 @@ def main():
                                 print("TTS mp3 save")
                                 f.write(response_body)
 
-                                time.sleep(2);
+                                #time.sleep(2);
                                 print('Play tts')
                                 p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
                                 p.communicate()
