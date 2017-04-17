@@ -155,7 +155,8 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
                 if (invalidate == 1 || tooOld == 1)
                 {
-                   this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                    this->mpLabels[pItem->mpLabel->mLabelIndex].mConfidence = 0.85;
 
                     LabelListItem *pDelItem = pItem;
 
@@ -339,9 +340,10 @@ void VectorClassFinder::run()
 int VectorClassFinder::sendToBridge(const char *name, void* buff, int size)
 {
     int     localSocket = -1;
-    struct  timeval time;
-    double  cur;
+    //struct  timeval time;
+    //double  cur;
 
+    /*
     if (gettimeofday(&time,NULL))
     {
         cur =  0;
@@ -364,6 +366,7 @@ int VectorClassFinder::sendToBridge(const char *name, void* buff, int size)
     LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
 
     this->mLastBridgeSendTime = cur;
+    */
 
     if ((localSocket = socket(PF_LOCAL, SOCK_STREAM, 0)) < 0)
     {
@@ -431,6 +434,8 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
     {
         time_t curr_time;
         struct tm *curr_tm;
+        struct  timeval _time;
+        double  cur;
 
         curr_time = time(NULL);
         curr_tm = localtime(&curr_time);
@@ -439,19 +444,62 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
         {
             LOGI("Do not open door for sequrity\n");
 
+            if (gTTSRedisContext)
+            {
+                char *name = "warning";
+                redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
+            }
+
             return 0;
         }
 
-        if (this->sendToBridge("/var/tmp/robot_bridge", (void *)"open", 4) == 0)
+        if (curr_tm->tm_wday == 6 || curr_tm->tm_wday == 0)
         {
-            // Successful open.
-            //this->mVersion = 0; // Reset.
+            LOGI("Do not open door for security\n");
 
             if (gTTSRedisContext)
             {
-                char *name = this->mpLabels[labelIndex].getLabel();
+                char *name = "warning";
                 redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
             }
+
+            return 0;
+        }
+
+        if (gettimeofday(&_time,NULL))
+        {
+            cur =  0;
+        }
+        else
+        {
+            cur = (double)_time.tv_sec + (double)_time.tv_usec * .000001;
+        }
+
+        if (this->mLastBridgeSendTime == 0)
+        {
+            this->mLastBridgeSendTime = cur;
+        }
+        else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL)
+        {
+            LOGI("Too Short Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+            return -1;
+        }
+
+        //LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+
+        this->mLastBridgeSendTime = cur;
+
+        if (gTTSRedisContext)
+        {
+            char *name = this->mpLabels[labelIndex].getLabel();
+            redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
+        }
+
+        if (this->sendToBridge("/var/tmp/robot_bridge", (void *)"open", 4) < 0)
+        {
+            // Successful open.
+            //this->mVersion = 0; // Reset.
+            LOGI("Robot send error\n");
         }
     }
     else
@@ -551,6 +599,8 @@ int VectorClassFinder::looperCallback(const char *event) {
             LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
 
             this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+            this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
 
             /*
             if (this->mpActiveLabelList == NULL)
@@ -626,6 +676,8 @@ int VectorClassFinder::looperCallback(const char *event) {
                     delete pV;
                     return 0;
                 }
+
+                LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
             }
 
             LOGD("Find New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
@@ -662,14 +714,6 @@ int VectorClassFinder::looperCallback(const char *event) {
 #if (USE_UPDATE_CHECK == 1)
                 this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
 #endif
-            }
-            else if (labelState == 0)
-            {
-                this->mpLabels[pV->mLabelIndex].setX(1);
-                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-                this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                LOGD("Still: %s", this->mpLabels[pV->mLabelIndex].getLabel());
             }
             else if (labelState < LABEL_READY_STATE)
             {

@@ -27,7 +27,13 @@ void callback(void *cmd, int length)
         return;
     }
 
-    sleep(1);
+    if (t->tm_wday == 6 || t->tm_wday == 0)
+    {
+        printf("For security, Do not operatate robot arms\n");
+        return;
+    }    
+
+    //sleep(1);
 
     write(uart_fd, str, strlen(str)+1);
 

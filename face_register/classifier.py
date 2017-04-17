@@ -166,6 +166,8 @@ def train(args):
                   # will be randomly dropped as a decimal.
         #          verbose=1)
 
+        num_epoch = args.epoch
+
         clf = DBN([-1, 256, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
                   learn_rates_pretrain=0.005,
@@ -174,7 +176,7 @@ def train(args):
                   #learn_rate_decays=0.9,
                   # a factor the initial learning rate will be multiplied by
                   # after each iteration of the training
-                  epochs=1000,  # no of iternation
+                  epochs=num_epoch,  # no of iternation
                   dropouts=0.5, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
                   verbose=1)
@@ -264,6 +266,8 @@ if __name__ == '__main__':
         'workDir',
         type=str,
         help="The input work directory containing 'reps.csv' and 'labels.csv'. Obtained from aligning a directory with 'align-dlib' and getting the representations with 'batch-represent'.")
+
+    trainParser.add_argument('--epoch', type=int, default=200)
 
     inferParser = subparsers.add_parser(
         'infer', help='Predict who an image contains from a trained classifier.')

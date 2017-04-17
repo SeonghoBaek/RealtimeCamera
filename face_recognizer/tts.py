@@ -19,15 +19,25 @@ fileDir = os.path.dirname(os.path.realpath(__file__))
 baseDir = fileDir + '/../'
 inputDir = baseDir + 'face_register/input'
 
-label_list = [d for d in os.listdir(inputDir) if os.path.isdir(inputDir + '/' + d) and d != 'Unknown']
+label_list = [d for d in os.listdir(inputDir + '/user') if os.path.isdir(inputDir + '/user/' + d) and d != 'Unknown']
 label_list.sort()
+
+label_list_iguest = [d for d in os.listdir(inputDir + '/iguest') if os.path.isdir(inputDir + '/iguest/' + d) and d != 'Unknown']
+label_list_iguest.sort()
+
+label_list_oguest = [d for d in os.listdir(inputDir + '/oguest') if os.path.isdir(inputDir + '/oguest/' + d) and d != 'Unknown']
+label_list_oguest.sort()
+
+label_list.extend(label_list_iguest)
+label_list.extend(label_list_oguest)
+
 print(label_list)
 
 name_dict = {'BaekSeongho': '백 성호', 'JangYoonseok': '장 윤석', 'KimDaeseoung': '김 대승', 'KimMina': '김 미나', 'KimHwiyoung': '김 휘영',
              'KimJinhyung': '김 진형', 'KimKeeyoung': '김 기영', 'KimSeokwon': '김 석원', 'KimSeongphyo': '김 성표',
-             'KimTaehee': '김 태희', 'KimYonbe': '김 연배', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
-             'LeeHyungyu': '이 현규', 'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
-             'NamKyungpil': '남 경필', 'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
+             'KimTaehee': '김 태희', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
+             'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
+             'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
              'SeoByungrak': '서 병락', 'Guest': '손님'}
 
 
@@ -42,7 +52,7 @@ sentences_B = ['산뜻한 오후 보내세요', '화이팅 하세요', '운동 �
 
 sentences_C = ['점심 드셨나요', '어서와요', '스마일', '오셨어요?', '멋집니다']
 
-sentences_D = ['곧 즐거운 퇴근이에요']
+sentences_D = ['곧 즐거운 퇴근이에요', '오늘도 수고 많으셨어요']
 
 sentences_E = ['어서 퇴근하셔야죠']
 
@@ -61,6 +71,95 @@ except:
     print('Redis Error')
 
 
+def get_voice(label, current):
+    path = './voice/' + label + '/'
+
+    if current < 12:
+        path = path + 'A'
+        size = len(os.listdir(path))
+        rv = random.randrange(0, size)
+        path = path + '/' + str(rv) + '_1.mp3'
+    elif current < 13:
+        path = path + 'C'
+        size = len(os.listdir(path))
+        rv = random.randrange(0, size)
+        path = path + '/' + str(rv) + '_1.mp3'
+    elif current < 18:
+        path = path + 'B'
+        size = len(os.listdir(path))
+        rv = random.randrange(0, size)
+        path = path + '/' + str(rv) + '_1.mp3'
+    else:
+        path = path + 'D'
+        size = len(os.listdir(path))
+        rv = random.randrange(0, size)
+        path = path + '/' + str(rv) + '_1.mp3'
+
+    print 'Play tts: ', label
+
+    return path
+'''
+    if 'Guest' in label:
+        path = '/tmp/welcom.mp3'
+        name = ' 손님 '
+        sentence = ''
+
+        if len(label) > 5:
+            num = label[5:]
+            name = num + ' 번 손님 '
+
+        if current < 12:
+            size = len(sentences_A)
+            rv = random.randrange(0, size)
+            sentence = sentences_A[rv]
+        elif current < 13:
+            size = len(sentences_C)
+            rv = random.randrange(0, size)
+            sentence = sentences_C[rv]
+        elif current < 18:
+            size = len(sentences_B)
+            rv = random.randrange(0, size)
+            sentence = sentences_B[rv]
+        else:
+            size = len(sentences_D)
+            rv = random.randrange(0, size)
+            sentence = sentences_D[rv]
+
+        print 'Play tts: ' + name
+
+        tts = gTTS(text=name + sentence, lang='ko')
+        tts.save(path)
+
+    else:
+        path = './voice/' + label + '/'
+
+        if current < 12:
+            path = path + 'A'
+            size = len(os.listdir(path))
+            rv = random.randrange(0, size)
+            path = path + '/' + str(rv) + '_1.mp3'
+        elif current < 13:
+            path = path + 'C'
+            size = len(os.listdir(path))
+            rv = random.randrange(0, size)
+            path = path + '/' + str(rv) + '_1.mp3'
+        elif current < 18:
+            path = path + 'B'
+            size = len(os.listdir(path))
+            rv = random.randrange(0, size)
+            path = path + '/' + str(rv) + '_1.mp3'
+        else:
+            path = path + 'D'
+            size = len(os.listdir(path))
+            rv = random.randrange(0, size)
+            path = path + '/' + str(rv) + '_1.mp3'
+
+        print 'Play tts: ', name_dict[label]
+
+    
+    return path
+'''
+
 def main():
     print('Listen redis')
 
@@ -68,89 +167,27 @@ def main():
         for item in pub.listen():
             data = item
 
-            print('Data received')
+            #print('Data received')
             if data is not None:
                 data = data.get('data')
 
                 if data > 1L:
-
                     label = data
 
-                    msg = "안녕하세요."
-
-                    name = ''
-
-                    if label[:5] == 'Guest':
-                        name = name_dict['Guest']
-                    else:
-                        if label == 'default':
-                            name = ''
-                        else:
-                            name = name_dict[label]
-                            name = name + '님 '
-
-                    print name
-
-                    now = datetime.datetime.now()
-
-                    if now.hour < 12:
-                        rv = random.randrange(0, len(sentences_A))
-
-                        sentence = sentences_A[rv]
-                    elif now.hour < 13:
-                        rv = random.randrange(0, len(sentences_C))
-
-                        sentence = sentences_C[rv]
-                    elif now.hour < 18:
-                        rv = random.randrange(0, len(sentences_B))
-
-                        sentence = sentences_B[rv]
-                    else:
-                        sentence = '어서 퇴근하셔야죠'
-
-                    voice = random.randrange(1, 10)
-
-                    msg = name + ', ' + sentence
-                    #msg = msg + ' ' + sentence
-
-                    if voice < 6:
-                        tts = gTTS(text=msg, lang='ko')
-                        tts.save('/tmp/welcome.mp3')
-
-                        #time.sleep(2);
-
-                        print('Play tts')
-                        p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
+                    if label is 'warning':
+                        tts = gTTS(text='보안 상 이유로 작동되지 않습니다.', lang='ko')
+                        tts.save('/var/tmp/warning.mp3')
+                        p = subprocess.Popen(['play', path])
                         p.communicate()
-                        print('Play done')
 
                     else:
-                        encText = urllib2.quote(msg)
-                        data = "speaker=mijin&speed=0&text=" + encText
-                        url = "https://openapi.naver.com/v1/voice/tts.bin"
-                        request = urllib2.Request(url)
+                        now = datetime.datetime.now()
+                        path = get_voice(label, now.hour)
+                        p = subprocess.Popen(['play', path])
+                        p.communicate()
 
-                        request.add_header("X-Naver-Client-Id", client_id)
-                        request.add_header("X-Naver-Client-Secret", client_secret)
-                        response = urllib2.urlopen(request, data=data.encode('utf-8'))
-                        rescode = response.getcode()
+                    print('Play done')
 
-                        if rescode == 200:
-                            response_body = response.read()
-
-                            with open('/tmp/welcome.mp3', 'wb') as f:
-                                print("TTS mp3 save")
-                                f.write(response_body)
-
-                                #time.sleep(2);
-                                print('Play tts')
-                                p = subprocess.Popen(['play', '/tmp/welcome.mp3'])
-                                p.communicate()
-                                print('Play done')
-
-
-                        else:
-                            print("Error Code:" + rescode)
     except:
         print('Error')
 

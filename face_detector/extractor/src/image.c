@@ -272,6 +272,14 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
             if (padded_top < 0) padded_top = 0;
             if (padded_bot > im.h - 1) padded_bot = im.h - 1;
 
+            printf("w: %d, h: %d\n", right - left, bot - top);
+
+            if (right-left > 120 || right-left < 60)
+            {
+                printf("Too large face. Ignore\n");
+                continue;
+            }
+
             if (gUploadStep == 0)
             {
                 unsigned char   *payload = NULL;

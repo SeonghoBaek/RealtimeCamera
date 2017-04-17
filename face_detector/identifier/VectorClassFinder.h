@@ -15,9 +15,11 @@
 
 #define CURRENT_NUM_LABEL 11
 #define MAX_LABEL_LENGTH 80
-#define LABEL_DIRECTORY "../face_register/input"
+#define LABEL_DIRECTORY "../face_register/input/user"
+#define LABEL_DIRECTORY_IGUEST "../face_register/input/iguest"
+#define LABEL_DIRECTORY_OGUEST "../face_register/input/oguest"
 
-#define LABEL_INVALIDATE_STATE -1
+#define LABEL_INVALIDATE_STATE -3
 #define LABEL_READY_STATE -1
 #define LABEL_VALID_STATE 1
 
@@ -52,6 +54,7 @@ public:
         mUpdateTime = 0;
         mChecked = 0;
         mLabelIndex = -1;
+        mConfidence = 0.85;
     }
 
     void setX(int x)
@@ -233,6 +236,60 @@ public:
             this->mNumLabel = numLabels;
         }
 
+        pDp = opendir(LABEL_DIRECTORY_IGUEST);
+
+        if (pDp)
+        {
+            int numLabels = 0;
+
+            readdir(pDp); // .
+            readdir(pDp); // ..
+
+            while (pDirent = readdir(pDp))
+            {
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
+                {
+                    if (strcmp(pDirent->d_name, unknown)) {
+                        numLabels++;
+                    }
+                }
+            }
+
+            closedir(pDp);
+
+            this->mNumLabel += numLabels;
+        }
+
+        pDp = opendir(LABEL_DIRECTORY_OGUEST);
+
+        if (pDp)
+        {
+            int numLabels = 0;
+
+            readdir(pDp); // .
+            readdir(pDp); // ..
+
+            while (pDirent = readdir(pDp))
+            {
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
+                {
+                    if (strcmp(pDirent->d_name, unknown)) {
+                        numLabels++;
+                    }
+                }
+            }
+
+            closedir(pDp);
+
+            this->mNumLabel += numLabels;
+        }
+
         this->mpLabels = new Label[this->mNumLabel];
 
         struct dirent **namelist;
@@ -266,35 +323,59 @@ public:
             free(namelist);
         }
 
-        /*
-        pDp = opendir(LABEL_DIRECTORY);
+        n = scandir(LABEL_DIRECTORY_IGUEST, &namelist, 0, alphasort);
 
-        if (pDp && this->mNumLabel > 0)
+        if (n < 0)
+            perror("scandir");
+        else
         {
-            this->mpLabels = new Label[this->mNumLabel];
-
-            readdir(pDp);
-            readdir(pDp);
-
-            int i = 0;
-
-            while (pDirent = readdir(pDp))
+            for (int i = 2; i < n; i++)
             {
-                sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY_IGUEST, namelist[i]->d_name);
                 stat(temp, &statbuf);
 
                 if (S_ISDIR(statbuf.st_mode))
                 {
-                    if (strcmp(pDirent->d_name, unknown)) {
-                        this->mpLabels[i].setLabel(pDirent->d_name);
-                        i++;
+                    //printf("%s\n", namelist[i]->d_name);
+                    if (strcmp(namelist[i]->d_name, unknown))
+                    {
+                        this->mpLabels[label_index].setLabel(namelist[i]->d_name);
+                        label_index++;
                     }
                 }
+
+                free(namelist[i]);
             }
 
-            closedir(pDp);
+            free(namelist);
         }
-         */
+
+        n = scandir(LABEL_DIRECTORY_OGUEST, &namelist, 0, alphasort);
+
+        if (n < 0)
+            perror("scandir");
+        else
+        {
+            for (int i = 2; i < n; i++)
+            {
+                sprintf(temp, "%s/%s", LABEL_DIRECTORY_OGUEST, namelist[i]->d_name);
+                stat(temp, &statbuf);
+
+                if (S_ISDIR(statbuf.st_mode))
+                {
+                    //printf("%s\n", namelist[i]->d_name);
+                    if (strcmp(namelist[i]->d_name, unknown))
+                    {
+                        this->mpLabels[label_index].setLabel(namelist[i]->d_name);
+                        label_index++;
+                    }
+                }
+
+                free(namelist[i]);
+            }
+
+            free(namelist);
+        }
 
         for (int i = 0; i < this->mNumLabel; i++)
         {
