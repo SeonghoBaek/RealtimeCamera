@@ -20,7 +20,7 @@ using namespace std;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define USE_TRACKING 1
-#define LABEL_VERSION_DIFF 30
+#define LABEL_VERSION_DIFF 15
 
 #if (IOU_SINGLE_MODE == 1)
 float IOU_INTERSECT_NEW_USER = 0.7;
@@ -440,7 +440,7 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
         curr_time = time(NULL);
         curr_tm = localtime(&curr_time);
 
-        if (curr_tm->tm_hour < 7 || curr_tm->tm_hour > 19)
+        if (curr_tm->tm_hour < 8 || curr_tm->tm_hour > 19)
         {
             LOGI("Do not open door for sequrity\n");
 
@@ -654,7 +654,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                     }
                     else
                     {
-                        LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+                        LOGD("Label State %d, %s, %d\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel(), abs(this->mVersion - prevVersion));
                         this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
                         this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
                     }
@@ -677,7 +677,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                     return 0;
                 }
 
-                LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+                LOGD("Label State %d, %s, %d\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel(), abs(this->mVersion - prevVersion));
             }
 
             LOGD("Find New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());

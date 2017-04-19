@@ -19,7 +19,7 @@
 #define LABEL_DIRECTORY_IGUEST "../face_register/input/iguest"
 #define LABEL_DIRECTORY_OGUEST "../face_register/input/oguest"
 
-#define LABEL_INVALIDATE_STATE -3
+#define LABEL_INVALIDATE_STATE -2
 #define LABEL_READY_STATE -1
 #define LABEL_VALID_STATE 1
 

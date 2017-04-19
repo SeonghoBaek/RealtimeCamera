@@ -25,11 +25,11 @@ label_list.sort()
 label_list_iguest = [d for d in os.listdir(inputDir + '/iguest') if os.path.isdir(inputDir + '/iguest/' + d) and d != 'Unknown']
 label_list_iguest.sort()
 
-label_list_oguest = [d for d in os.listdir(inputDir + '/oguest') if os.path.isdir(inputDir + '/oguest/' + d) and d != 'Unknown']
-label_list_oguest.sort()
+#label_list_oguest = [d for d in os.listdir(inputDir + '/oguest') if os.path.isdir(inputDir + '/oguest/' + d) and d != 'Unknown']
+#label_list_oguest.sort()
 
 label_list.extend(label_list_iguest)
-label_list.extend(label_list_oguest)
+#label_list.extend(label_list_oguest)
 
 print(label_list)
 
@@ -95,79 +95,21 @@ def get_voice(label, current):
         rv = random.randrange(0, size)
         path = path + '/' + str(rv) + '_1.mp3'
 
-    print 'Play tts: ', label
-
-    return path
-'''
     if 'Guest' in label:
-        path = '/tmp/welcom.mp3'
-        name = ' 손님 '
-        sentence = ''
-
-        if len(label) > 5:
-            num = label[5:]
-            name = num + ' 번 손님 '
-
-        if current < 12:
-            size = len(sentences_A)
-            rv = random.randrange(0, size)
-            sentence = sentences_A[rv]
-        elif current < 13:
-            size = len(sentences_C)
-            rv = random.randrange(0, size)
-            sentence = sentences_C[rv]
-        elif current < 18:
-            size = len(sentences_B)
-            rv = random.randrange(0, size)
-            sentence = sentences_B[rv]
-        else:
-            size = len(sentences_D)
-            rv = random.randrange(0, size)
-            sentence = sentences_D[rv]
-
-        print 'Play tts: ' + name
-
-        tts = gTTS(text=name + sentence, lang='ko')
-        tts.save(path)
-
+        print 'Play tts: ', '손님 ' + label[5:]
     else:
-        path = './voice/' + label + '/'
-
-        if current < 12:
-            path = path + 'A'
-            size = len(os.listdir(path))
-            rv = random.randrange(0, size)
-            path = path + '/' + str(rv) + '_1.mp3'
-        elif current < 13:
-            path = path + 'C'
-            size = len(os.listdir(path))
-            rv = random.randrange(0, size)
-            path = path + '/' + str(rv) + '_1.mp3'
-        elif current < 18:
-            path = path + 'B'
-            size = len(os.listdir(path))
-            rv = random.randrange(0, size)
-            path = path + '/' + str(rv) + '_1.mp3'
-        else:
-            path = path + 'D'
-            size = len(os.listdir(path))
-            rv = random.randrange(0, size)
-            path = path + '/' + str(rv) + '_1.mp3'
-
         print 'Play tts: ', name_dict[label]
 
-    
     return path
-'''
+
 
 def main():
     print('Listen redis')
 
-    try:
-        for item in pub.listen():
+    for item in pub.listen():
+        try:
             data = item
 
-            #print('Data received')
             if data is not None:
                 data = data.get('data')
 
@@ -175,8 +117,9 @@ def main():
                     label = data
 
                     if label is 'warning':
+                        path = '/var/tmp/warning.mp3'
                         tts = gTTS(text='보안 상 이유로 작동되지 않습니다.', lang='ko')
-                        tts.save('/var/tmp/warning.mp3')
+                        tts.save(path)
                         p = subprocess.Popen(['play', path])
                         p.communicate()
 
@@ -188,8 +131,8 @@ def main():
 
                     print('Play done')
 
-    except:
-        print('Error')
+        except:
+            print('Error')
 
 if __name__ == "__main__":
     main()

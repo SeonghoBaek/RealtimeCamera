@@ -21,7 +21,7 @@ void callback(void *cmd, int length)
 
     printf("Current hour: %d\n", t->tm_hour);
 
-    if (t->tm_hour < 7 || t->tm_hour > 19)
+    if (t->tm_hour < 8 || t->tm_hour > 19)
     {
         printf("For security, Do not operatate robot arms\n");
         return;

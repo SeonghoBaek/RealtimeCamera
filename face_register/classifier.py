@@ -26,7 +26,8 @@ import argparse
 import cv2
 import os
 import pickle
-
+import shutil
+import random
 from operator import itemgetter
 
 import numpy as np
@@ -44,6 +45,7 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.mixture import GMM
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import log_loss
 
 fileDir = os.path.dirname(os.path.realpath(__file__))
 modelDir = os.path.join(fileDir, '../openface', 'models')
@@ -101,6 +103,55 @@ def getRep(imgPath, multiple=False):
         reps.append((bb.center().x, rep))
     sreps = sorted(reps, key=lambda x: x[0])
     return sreps
+
+
+def input_sampling(path, size):
+    label_dir_list = [d for d in os.listdir('./input/iguest')]
+    label_dir_size = len(label_dir_list)
+    label_list = []
+    sample_list = []
+    index = 0
+
+    for d in os.listdir('./input/iguest'):
+        listing = [path + d + '/' + f for f in os.listdir('./input/iguest/' + d)]
+        random.shuffle(listing)
+        label_list.append(listing)
+        index += 1
+
+    for j in range(size):
+        for i in range(label_dir_size):
+            if len(label_list[i]) > j:
+                sample_list.append(label_list[i][j])
+
+    for i in range(len(sample_list)):
+        shutil.copy(sample_list[i], './input/user/Guest/')
+
+
+def dbn_loss_func(targets, outputs):
+    if hasattr(targets, 'as_numpy_array'):  # pragma: no cover
+        targets = targets.as_numpy_array()
+    if hasattr(outputs, 'as_numpy_array'):
+        outputs = outputs.as_numpy_array()
+
+    #print outputs, targets
+
+    #for v in outputs:
+    #    v = np.exp(v) / np.sum(np.exp(v), axis=0)
+    #    print v
+
+    err_sum = 0.0
+
+    for i in range(len(outputs)):
+        #print outputs[i]
+        #err_sum += np.sum(np.square(outputs[i] - targets[i]))
+        err_sum += log_loss(targets[i], outputs[i])
+        #outputs[i] = np.exp(outputs[i]) / np.sum(np.exp(outputs[i]), axis=0)
+        #print outputs[i]
+     #   print err_sum
+    err_sum = err_sum / len(outputs)
+    #err_sum = log_loss(targets, outputs)
+
+    return err_sum
 
 
 def train(args):
@@ -176,14 +227,22 @@ def train(args):
                   #learn_rate_decays=0.9,
                   # a factor the initial learning rate will be multiplied by
                   # after each iteration of the training
+                  minibatch_size=32,
                   epochs=num_epoch,  # no of iternation
                   dropouts=0.5, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
+                  #loss_funct=dbn_loss_func,
                   verbose=1)
-    if args.ldaDim > 0:
+
+    #if args.ldaDim > 0:
+    #    clf_final = clf
+    #    dim = nClasses - 1
+    #    clf = Pipeline([('lda', LDA(n_components=args.ldaDim)),
+    #                    ('clf', clf_final)])
+
+    if args.classifier == 'DBN':
         clf_final = clf
-        clf = Pipeline([('lda', LDA(n_components=args.ldaDim)),
-                        ('clf', clf_final)])
+        clf = Pipeline([('lda', LDA(n_components=nClasses-1)), ('clf', clf_final)])
 
     clf.fit(embeddings, labelsNum)
 
@@ -223,7 +282,6 @@ def infer(args, multiple=False):
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
