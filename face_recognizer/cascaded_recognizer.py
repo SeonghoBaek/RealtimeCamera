@@ -354,40 +354,74 @@ def infer(fileName, mode):
 
     print '   AVG: ', avgt
 
-    if avgt < threshold + 0.05:
-        #if confidence > fn_threshold:
-        if avgt > fn_threshold:
-            dist_list = []
+    if mode == 'user':
+        if avgt < threshold + 0.05:
+            #if confidence > fn_threshold:
+            if avgt > fn_threshold:
+                dist_list = []
 
-            #print person, confidence
+                #print person, confidence
 
-            sz = len(emb_list[person])
+                sz = len(emb_list[person])
 
-            for i in range(sz):
-                dst = distance.euclidean(emb_list[person][i], rep)
-                dist_list.append(dst)
+                for i in range(sz):
+                    dst = distance.euclidean(emb_list[person][i], rep)
+                    dist_list.append(dst)
 
-            m = np.mean(dist_list)
-            #m = np.max(dist_list)
+                m = np.mean(dist_list)
+                #m = np.max(dist_list)
 
-            confidence_interval = std_list[person]
+                confidence_interval = std_list[person]
 
-            thd = mean_list[person] + confidence_interval
+                thd = mean_list[person] + confidence_interval
 
-            print '   DIST: ', m, thd
+                print '   DIST: ', m, thd
 
-            c = np.array([confidence_dbn, confidence])
+                c = np.array([confidence_dbn, confidence])
 
-            if m < thd:
-                confidence = avgt   #c.max()
-            else:
-                confidence = c.min()
+                if m < thd:
+                    confidence = avgt   #c.max()
+                else:
+                    confidence = c.min()
 
+        else:
+            confidence = avgt
     else:
-        confidence = avgt
+        c = np.array([confidence_dbn, confidence])
 
-    #if 'nobody' in person:
-    #    confidence = 0
+        if person == person_dbn:
+            avgt = c.max()
+        else:
+            avgt = confidence
+
+        if avgt < threshold + 0.05:
+            if avgt > 0.5:  #loose limit for guest group
+                dist_list = []
+
+                # print person, confidence
+
+                sz = len(emb_list[person])
+
+                for i in range(sz):
+                    dst = distance.euclidean(emb_list[person][i], rep)
+                    dist_list.append(dst)
+
+                m = np.mean(dist_list)
+                # m = np.max(dist_list)
+
+                confidence_interval = std_list[person]
+
+                thd = mean_list[person] + confidence_interval
+
+                print '   DIST: ', m, thd
+
+                if m < thd:
+                    confidence = threshold
+                else:
+                    confidence = avgt
+
+        else:
+            confidence = avgt
 
     return person, confidence
 
@@ -633,42 +667,41 @@ def main():
 
                         person, confidence = infer(fileName, 'user')
 
-                        info_print("\nUser Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                        info_print("\n   User Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                         candidate = person
                         candidate_confidence = confidence
 
                         if candidate_confidence < threshold:
                             person, confidence = infer(fileName, 'iguest')
-                            info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                            info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                             if candidate == 'Guest':
                                 if person == 'User':
                                     candidate = 'Unknown'
                                 else:
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
                                         candidate = person
                                         candidate_confidence = confidence
                             elif candidate != 'Unknown' and candidate != 'nobody':
                                 if person != 'User':
-                                    candidate = person
-
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
+                                        candidate = person
                                         candidate_confidence = confidence
-                                    else:
-                                        if confidence > candidate_confidence:
-                                            candidate_confidence = confidence
+                                    #else:
+                                    #    if confidence > candidate_confidence:
+                                    #        candidate_confidence = confidence
 
                         else:
                             person, confidence = infer(fileName, 'iguest')
 
-                            info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                            info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                             if candidate == 'Guest':
                                 if person == 'User':
                                     candidate = 'Unknown'
                                 else:
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
                                         candidate = person
                                         candidate_confidence = confidence
 
@@ -682,7 +715,7 @@ def main():
                                 candidate_confidence = confidence
                         '''
 
-                        if confidence < threshold:
+                        if candidate_confidence < threshold:
                             info_print("\nWho are you?: " + candidate + '(' + str(int(100*candidate_confidence)) + '%)')
 
                             save_unknown_user(fileName, dirname, candidate)
@@ -714,42 +747,41 @@ def main():
                             jpgFile.close()
 
                             person, confidence = infer(fileName, 'user')
-                            info_print("\nUser Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                            info_print("\n   User Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                             candidate = person
                             candidate_confidence = confidence
 
                             if candidate_confidence < threshold:
                                 person, confidence = infer(fileName, 'iguest')
-                                info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                                info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                                 if candidate == 'Guest':
                                     if person == 'User':
                                         candidate = 'Unknown'
                                     else:
-                                        if confidence > threshold:
+                                        if confidence >= threshold:
                                             candidate = person
                                             candidate_confidence = confidence
                                 elif candidate != 'Unknown' and candidate != 'nobody':
                                     if person != 'User':
-                                        candidate = person
-
-                                        if confidence > threshold:
+                                        if confidence >= threshold:
+                                            candidate = person
                                             candidate_confidence = confidence
-                                        else:
-                                            if confidence > candidate_confidence:
-                                                candidate_confidence = confidence
+                                            # else:
+                                            #    if confidence > candidate_confidence:
+                                            #        candidate_confidence = confidence
 
                             else:
                                 person, confidence = infer(fileName, 'iguest')
 
-                                info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                                info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                                 if candidate == 'Guest':
                                     if person == 'User':
                                         candidate = 'Unknown'
                                     else:
-                                        if confidence > threshold:
+                                        if confidence >= threshold:
                                             candidate = person
                                             candidate_confidence = confidence
 
@@ -762,7 +794,7 @@ def main():
                                     candidate = person
                                     candidate_confidence = confidence
                             '''
-                            if confidence < threshold:
+                            if candidate_confidence < threshold:
                                 info_print(
                                     "\nWho are you?: " + candidate + '(' + str(int(100 * candidate_confidence)) + '%)')
 
