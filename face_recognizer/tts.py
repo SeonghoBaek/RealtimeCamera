@@ -106,33 +106,37 @@ def get_voice(label, current):
 def main():
     print('Listen redis')
 
-    for item in pub.listen():
-        try:
-            data = item
+    try:
+        for item in pub.listen():
+            try:
+                data = item
 
-            if data is not None:
-                data = data.get('data')
+                if data is not None:
+                    data = data.get('data')
 
-                if data > 1L:
-                    label = data
+                    if data > 1L:
+                        label = data
 
-                    if label is 'warning':
-                        path = '/var/tmp/warning.mp3'
-                        tts = gTTS(text='보안 상 이유로 작동되지 않습니다.', lang='ko')
-                        tts.save(path)
-                        p = subprocess.Popen(['play', path])
-                        p.communicate()
+                        if label is 'warning':
+                            path = '/var/tmp/warning.mp3'
+                            tts = gTTS(text='보안 상 이유로 작동되지 않습니다.', lang='ko')
+                            tts.save(path)
+                            p = subprocess.Popen(['play', path])
+                            p.communicate()
 
-                    else:
-                        now = datetime.datetime.now()
-                        path = get_voice(label, now.hour)
-                        p = subprocess.Popen(['play', path])
-                        p.communicate()
+                        else:
+                            now = datetime.datetime.now()
+                            path = get_voice(label, now.hour)
+                            p = subprocess.Popen(['play', path])
+                            p.communicate()
 
-                    print('Play done')
+                        print('Play done')
 
-        except:
-            print('Error')
+            except subprocess.CalledProcessError:
+                print('\nSubprocess Error')
+
+    except:
+        print('\nRedis Disconnected')
 
 if __name__ == "__main__":
     main()

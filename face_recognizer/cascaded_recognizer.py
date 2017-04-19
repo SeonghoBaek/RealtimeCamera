@@ -343,7 +343,7 @@ def infer(fileName, mode):
     print "   SVM: ", person, confidence
 
     if person != person_dbn:
-        return person, 0
+        return 'Unknown', 0
 
     if confidence < 0.85:  # Hard limit
         return person, confidence
@@ -542,12 +542,12 @@ def handler(signum, frame):
     minute = time.strftime('%M')
 
     if minute == 29 or minute == 59:
-        print 'Supposed to be start training. Wait.'
+        print '\n\nSupposed to be start training. Wait.'
 
         return
 
     if os.path.exists(inputDir + '/../on_training'):
-        print 'On Training. Wait.'
+        print '\n\nOn Training. Wait.'
 
         return
 
@@ -649,7 +649,7 @@ def main():
                                     if confidence > threshold:
                                         candidate = person
                                         candidate_confidence = confidence
-                            else:
+                            elif candidate != 'Unknown' and candidate != 'nobody':
                                 if person != 'User':
                                     candidate = person
 
@@ -685,17 +685,21 @@ def main():
                         if confidence < threshold:
                             info_print("\nWho are you?: " + candidate + '(' + str(int(100*candidate_confidence)) + '%)')
 
+                            save_unknown_user(fileName, dirname, candidate)
+
+                            '''
                             if candidate_confidence > 0.8:
                                 dirname = save_unknown_user(fileName, dirname, candidate)
                             else:
                                 dirname = save_unknown_user(fileName, dirname, 'Unknown')
+                            '''
                         else:
                             #info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
                             info_print("\nPredict {} : {} %".format(candidate, int(100 * candidate_confidence)))
 
                         if candidate_confidence > 0:
                             if sock_ready is True:
-                                if person != 'Unknown' and person != 'nobody':
+                                if candidate != 'Unknown' and candidate != 'nobody':
                                     b_array = bytes()
                                     floatList = [left, right, top, bottom, candidate_confidence, label_list.index(candidate)]
                                     #debug_print("INDEX: " + str(label_list.index(person)))
@@ -726,7 +730,7 @@ def main():
                                         if confidence > threshold:
                                             candidate = person
                                             candidate_confidence = confidence
-                                else:
+                                elif candidate != 'Unknown' and candidate != 'nobody':
                                     if person != 'User':
                                         candidate = person
 
@@ -762,20 +766,23 @@ def main():
                                 info_print(
                                     "\nWho are you?: " + candidate + '(' + str(int(100 * candidate_confidence)) + '%)')
 
+                                save_unknown_user(fileName, dirname, candidate)
+
+                                '''
                                 if candidate_confidence > 0.8:
                                     dirname = save_unknown_user(fileName, dirname, candidate)
                                 else:
                                     dirname = save_unknown_user(fileName, dirname, 'Unknown')
+                                '''
                             else:
                                 # info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
                                 info_print("\nPredict {} : {} %".format(candidate, int(100 * candidate_confidence)))
 
                             if candidate_confidence > 0:
                                 if sock_ready is True:
-                                    if person != 'Unknown' and person != 'nobody':
+                                    if candidate != 'Unknown' and candidate != 'nobody':
                                         b_array = bytes()
-                                        floatList = [left, right, top, bottom, candidate_confidence,
-                                                     label_list.index(candidate)]
+                                        floatList = [left, right, top, bottom, candidate_confidence, label_list.index(candidate)]
                                         # debug_print("INDEX: " + str(label_list.index(person)))
                                         b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                         sock.send(b_array)
@@ -785,7 +792,7 @@ def main():
                 else:
                     rds.set('frame', '1')
     except:
-        debug_print('Exit')
+        print 'Exit'
 
 
 if __name__ == "__main__":
