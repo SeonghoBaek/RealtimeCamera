@@ -229,7 +229,8 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 #ifdef SHOW_WINDOW
     cvNamedWindow("Camera", CV_WINDOW_NORMAL);
     cvMoveWindow("Camera", 0, 0);
-    cvResizeWindow("Camera", 1200, 900); // 1352 , 1013
+    //cvResizeWindow("Camera", 1200, 900); // 1352 , 1013
+    cvResizeWindow("Camera", 1920, 1080); // 1352 , 1013
 #endif
 
     while (1) {

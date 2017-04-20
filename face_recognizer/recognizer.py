@@ -91,6 +91,7 @@ except:
 
 (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
 (le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
+
 sock_ready = False
 
 try:
@@ -100,7 +101,6 @@ try:
     #debug_print('Connected')
 except:
     sock_ready = False
-
 
 
 def getRep(imgPath, multiple=False):

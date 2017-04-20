@@ -18,118 +18,16 @@ import pandas as pd
 from operator import itemgetter
 import numpy as np
 import signal
-
-threshold = 0.9
-fn_threshold = 0.8
-alpha = 1.64  #95%: 1.96, 90 %: 1.64
-show_time = False
-debug = False
-info = True
-save_representation = False
-use_face_align = True
-
-fileDir = os.path.dirname(os.path.realpath(__file__))
-# Modify baseDir to your environment
-baseDir = fileDir + '/../' 
-modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
-inputDir = baseDir + 'face_register/input'
-repDir = baseDir + 'face_register/reps'
-dlibModelDir = os.path.join(modelDir, 'dlib')
-openfaceModelDir = os.path.join(modelDir, 'openface')
-haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
-dlibDetector = dlib.get_frontal_face_detector()
-label_list = [d for d in os.listdir(inputDir + '/user')]
-label_list.sort()
-
-label_list_iguest = [d for d in os.listdir(inputDir + '/iguest')]
-label_list_iguest.sort()
-
-#label_list_oguest = [d for d in os.listdir(inputDir + '/oguest')]
-#label_list_oguest.sort()
-
-label_list.extend(label_list_iguest)
-#label_list.extend(label_list_oguest)
-
-print(label_list)
-
-g_dist_min_list = {}
-g_dist_mean_list = {}
-g_std_list = {}
-g_embedding_list = {}
-
-g_iguest_dist_min_list = {}
-g_iguest_dist_mean_list = {}
-g_iguest_std_list = {}
-g_iguest_embedding_list = {}
-
-g_oguest_dist_min_list = {}
-g_oguest_dist_mean_list = {}
-g_oguest_std_list = {}
-g_oguest_embedding_list = {}
-
-HOST, PORT = "10.100.1.152", 55555
-#HOST, PORT = "10.100.0.53", 55555
-REDIS_SERVER = '10.100.1.150'
-REDIS_PORT = 6379
-parser = argparse.ArgumentParser()
-
-#parser.add_argument('imgs', type=str, nargs='+', help="Input images.")
-parser.add_argument('--dlibFacePredictor', type=str, help="Path to dlib's face predictor.",
-                    default=os.path.join(dlibModelDir, "shape_predictor_68_face_landmarks.dat"))
-parser.add_argument('--networkModel', type=str, help="Path to Torch network model.",
-                    default=os.path.join(openfaceModelDir, 'nn4.small2.v1.t7'))
-parser.add_argument('--imgDim', type=int,
-                    help="Default image dimension.", default=96)
-parser.add_argument('--verbose', action='store_true')
-
-parser.add_argument('--cuda', action='store_true')
-
-args = parser.parse_args()
-
-align = openface.AlignDlib(args.dlibFacePredictor)
-net = openface.TorchNeuralNet(args.networkModel, imgDim=args.imgDim, cuda=args.cuda)
-
-redis_ready = False
-
+import sys
 
 def debug_print(str):
     if debug is True:
         print(str)
 
+
 def info_print(str):
     if info is True:
         print(str)
-
-try:
-    rds = redis.StrictRedis(host=REDIS_SERVER,port=REDIS_PORT,db=0)
-
-    p = rds.pubsub()
-    p.subscribe('camera')
-    redis_ready = True
-
-except:
-    redis_ready = False
-
-(le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
-(le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
-
-# Individual Guest Group
-(le_iguest, clf_iguest) = pickle.load(open(baseDir + '/svm/classifier_iguest.pkl', 'r'))
-(le_dbn_iguest, clf_dbn_iguest) = pickle.load(open(baseDir + '/dbn/classifier_iguest.pkl', 'r'))
-
-# Overall Guest Group
-#(le_oguest, clf_oguest) = pickle.load(open(baseDir + '/svm/classifier_oguest.pkl', 'r'))
-#(le_dbn_oguest, clf_dbn_oguest) = pickle.load(open(baseDir + '/dbn/classifier_oguest.pkl', 'r'))
-
-sock_ready = False
-
-try:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect((HOST, PORT))
-    sock_ready = True
-    #debug_print('Connected')
-except:
-    sock_ready = False
 
 
 def getRep(imgPath, multiple=False):
@@ -354,40 +252,74 @@ def infer(fileName, mode):
 
     print '   AVG: ', avgt
 
-    if avgt < threshold + 0.05:
-        #if confidence > fn_threshold:
-        if avgt > fn_threshold:
-            dist_list = []
+    if mode == 'user':
+        if avgt < threshold + 0.05:
+            #if confidence > fn_threshold:
+            if avgt > fn_threshold:
+                dist_list = []
 
-            #print person, confidence
+                #print person, confidence
 
-            sz = len(emb_list[person])
+                sz = len(emb_list[person])
 
-            for i in range(sz):
-                dst = distance.euclidean(emb_list[person][i], rep)
-                dist_list.append(dst)
+                for i in range(sz):
+                    dst = distance.euclidean(emb_list[person][i], rep)
+                    dist_list.append(dst)
 
-            m = np.mean(dist_list)
-            #m = np.max(dist_list)
+                m = np.mean(dist_list)
+                #m = np.max(dist_list)
 
-            confidence_interval = std_list[person]
+                confidence_interval = std_list[person]
 
-            thd = mean_list[person] + confidence_interval
+                thd = mean_list[person] + confidence_interval
 
-            print '   DIST: ', m, thd
+                print '   DIST: ', m, thd
 
-            c = np.array([confidence_dbn, confidence])
+                c = np.array([confidence_dbn, confidence])
 
-            if m < thd:
-                confidence = avgt   #c.max()
-            else:
-                confidence = c.min()
+                if m < thd:
+                    confidence = avgt   #c.max()
+                else:
+                    confidence = c.min()
 
+        else:
+            confidence = avgt
     else:
-        confidence = avgt
+        c = np.array([confidence_dbn, confidence])
 
-    #if 'nobody' in person:
-    #    confidence = 0
+        if person == person_dbn:
+            avgt = c.max()
+        else:
+            avgt = confidence
+
+        if avgt < threshold + 0.05:
+            if avgt > 0.5:  #loose limit for guest group
+                dist_list = []
+
+                # print person, confidence
+
+                sz = len(emb_list[person])
+
+                for i in range(sz):
+                    dst = distance.euclidean(emb_list[person][i], rep)
+                    dist_list.append(dst)
+
+                m = np.mean(dist_list)
+                # m = np.max(dist_list)
+
+                confidence_interval = std_list[person]
+
+                thd = mean_list[person] + confidence_interval
+
+                print '   DIST: ', m, thd
+
+                if m < thd:
+                    confidence = threshold # Boost to threshold
+                else:
+                    confidence = avgt
+
+        else:
+            confidence = avgt
 
     return person, confidence
 
@@ -538,27 +470,19 @@ def initialize_rep_distance_list(embedding_path, min_list, mean_list, std_list, 
 
 
 def handler(signum, frame):
-
-    minute = time.strftime('%M')
-
-    if minute == 29 or minute == 59:
-        print '\n\nSupposed to be start training. Wait.'
-
-        return
+    # restore the exit gracefully handler here
+    signal.signal(signal.SIGINT, os_handler)
 
     if os.path.exists(inputDir + '/../on_training'):
         print '\n\nOn Training. Wait.'
+    else:
+        print '\n\nGood Bye.'
+        sys.exit(1)
 
-        return
-
-    print '\n\nGood Bye.'
-
-    exit(0)
+    signal.signal(signal.SIGINT, handler)
 
 
 def main():
-    signal.signal(signal.SIGINT, handler)
-
     if redis_ready is False:
         #debug_print('REDIS not ready.')
         return
@@ -621,11 +545,11 @@ def main():
 
                     queued_frame = (int(frame_str) + 30 - recv_frame) % 30
 
-                    #debug_print('delayed: ' + str(queued_frame))    
+                    #info_print('delayed: ' + str(queued_frame))
 
                     next_target_frame = int(frame_str)
 
-                    if recv_frame == cur_target_frame:
+                    if recv_frame == cur_target_frame or recv_frame == next_target_frame:
                         fileName = "/tmp/input.jpg"
                         jpgFile = open(fileName, "wb")
                         jpgFile.write(ar)
@@ -633,42 +557,45 @@ def main():
 
                         person, confidence = infer(fileName, 'user')
 
-                        info_print("\nUser Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                        info_print("\n   User Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                         candidate = person
                         candidate_confidence = confidence
 
                         if candidate_confidence < threshold:
                             person, confidence = infer(fileName, 'iguest')
-                            info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                            info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                             if candidate == 'Guest':
                                 if person == 'User':
                                     candidate = 'Unknown'
                                 else:
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
                                         candidate = person
                                         candidate_confidence = confidence
+                                    elif confidence > fn_threshold and confidence >= candidate_confidence:
+                                        candidate = person
+                                        candidate_confidence = confidence
+
                             elif candidate != 'Unknown' and candidate != 'nobody':
                                 if person != 'User':
-                                    candidate = person
-
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
+                                        candidate = person
                                         candidate_confidence = confidence
-                                    else:
-                                        if confidence > candidate_confidence:
-                                            candidate_confidence = confidence
+                                        # else:
+                                        #    if confidence > candidate_confidence:
+                                        #        candidate_confidence = confidence
 
                         else:
                             person, confidence = infer(fileName, 'iguest')
 
-                            info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
+                            info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
 
                             if candidate == 'Guest':
                                 if person == 'User':
                                     candidate = 'Unknown'
                                 else:
-                                    if confidence > threshold:
+                                    if confidence >= threshold:
                                         candidate = person
                                         candidate_confidence = confidence
 
@@ -682,8 +609,9 @@ def main():
                                 candidate_confidence = confidence
                         '''
 
-                        if confidence < threshold:
-                            info_print("\nWho are you?: " + candidate + '(' + str(int(100*candidate_confidence)) + '%)')
+                        if candidate_confidence < threshold:
+                            info_print(
+                                "\nWho are you?: " + candidate + '(' + str(int(100 * candidate_confidence)) + '%)')
 
                             save_unknown_user(fileName, dirname, candidate)
 
@@ -694,101 +622,21 @@ def main():
                                 dirname = save_unknown_user(fileName, dirname, 'Unknown')
                             '''
                         else:
-                            #info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
+                            # info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
                             info_print("\nPredict {} : {} %".format(candidate, int(100 * candidate_confidence)))
 
                         if candidate_confidence > 0:
                             if sock_ready is True:
                                 if candidate != 'Unknown' and candidate != 'nobody':
                                     b_array = bytes()
-                                    floatList = [left, right, top, bottom, candidate_confidence, label_list.index(candidate)]
-                                    #debug_print("INDEX: " + str(label_list.index(person)))
+                                    floatList = [left, right, top, bottom, candidate_confidence,
+                                                 label_list.index(candidate)]
+                                    # debug_print("INDEX: " + str(label_list.index(person)))
                                     b_array = b_array.join((struct.pack('f', val) for val in floatList))
                                     sock.send(b_array)
-
                     else:
-                        if recv_frame == next_target_frame:
-                            fileName = "/tmp/input.jpg"
-                            jpgFile = open(fileName, "wb")
-                            jpgFile.write(ar)
-                            jpgFile.close()
+                        cur_target_frame = next_target_frame
 
-                            person, confidence = infer(fileName, 'user')
-                            info_print("\nUser Group:" + person + '(' + str(int(100 * confidence)) + '%)')
-
-                            candidate = person
-                            candidate_confidence = confidence
-
-                            if candidate_confidence < threshold:
-                                person, confidence = infer(fileName, 'iguest')
-                                info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
-
-                                if candidate == 'Guest':
-                                    if person == 'User':
-                                        candidate = 'Unknown'
-                                    else:
-                                        if confidence > threshold:
-                                            candidate = person
-                                            candidate_confidence = confidence
-                                elif candidate != 'Unknown' and candidate != 'nobody':
-                                    if person != 'User':
-                                        candidate = person
-
-                                        if confidence > threshold:
-                                            candidate_confidence = confidence
-                                        else:
-                                            if confidence > candidate_confidence:
-                                                candidate_confidence = confidence
-
-                            else:
-                                person, confidence = infer(fileName, 'iguest')
-
-                                info_print("IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
-
-                                if candidate == 'Guest':
-                                    if person == 'User':
-                                        candidate = 'Unknown'
-                                    else:
-                                        if confidence > threshold:
-                                            candidate = person
-                                            candidate_confidence = confidence
-
-                            '''
-                            if confidence < threshold:
-                                person, confidence = infer(fileName, 'oguest')
-                                info_print("OGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
-
-                                if confidence > candidate_confidence:
-                                    candidate = person
-                                    candidate_confidence = confidence
-                            '''
-                            if confidence < threshold:
-                                info_print(
-                                    "\nWho are you?: " + candidate + '(' + str(int(100 * candidate_confidence)) + '%)')
-
-                                save_unknown_user(fileName, dirname, candidate)
-
-                                '''
-                                if candidate_confidence > 0.8:
-                                    dirname = save_unknown_user(fileName, dirname, candidate)
-                                else:
-                                    dirname = save_unknown_user(fileName, dirname, 'Unknown')
-                                '''
-                            else:
-                                # info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
-                                info_print("\nPredict {} : {} %".format(candidate, int(100 * candidate_confidence)))
-
-                            if candidate_confidence > 0:
-                                if sock_ready is True:
-                                    if candidate != 'Unknown' and candidate != 'nobody':
-                                        b_array = bytes()
-                                        floatList = [left, right, top, bottom, candidate_confidence, label_list.index(candidate)]
-                                        # debug_print("INDEX: " + str(label_list.index(person)))
-                                        b_array = b_array.join((struct.pack('f', val) for val in floatList))
-                                        sock.send(b_array)
-
-                        else:
-                            cur_target_frame = next_target_frame
                 else:
                     rds.set('frame', '1')
     except:
@@ -796,5 +644,111 @@ def main():
 
 
 if __name__ == "__main__":
+    os_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, handler)
+
+    threshold = 0.9
+    fn_threshold = 0.8
+    alpha = 1.64  # 95%: 1.96, 90 %: 1.64
+    show_time = False
+    debug = False
+    info = True
+    save_representation = False
+    use_face_align = True
+
+    fileDir = os.path.dirname(os.path.realpath(__file__))
+    # Modify baseDir to your environment
+    baseDir = fileDir + '/../'
+    modelDir = os.path.join(fileDir, baseDir + '/openface', 'models')
+    inputDir = baseDir + 'face_register/input'
+    repDir = baseDir + 'face_register/reps'
+    dlibModelDir = os.path.join(modelDir, 'dlib')
+    openfaceModelDir = os.path.join(modelDir, 'openface')
+    haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
+    dlibDetector = dlib.get_frontal_face_detector()
+    label_list = [d for d in os.listdir(inputDir + '/user')]
+    label_list.sort()
+
+    label_list_iguest = [d for d in os.listdir(inputDir + '/iguest')]
+    label_list_iguest.sort()
+
+    # label_list_oguest = [d for d in os.listdir(inputDir + '/oguest')]
+    # label_list_oguest.sort()
+
+    label_list.extend(label_list_iguest)
+    # label_list.extend(label_list_oguest)
+
+    print(label_list)
+
+    g_dist_min_list = {}
+    g_dist_mean_list = {}
+    g_std_list = {}
+    g_embedding_list = {}
+
+    g_iguest_dist_min_list = {}
+    g_iguest_dist_mean_list = {}
+    g_iguest_std_list = {}
+    g_iguest_embedding_list = {}
+
+    g_oguest_dist_min_list = {}
+    g_oguest_dist_mean_list = {}
+    g_oguest_std_list = {}
+    g_oguest_embedding_list = {}
+
+    HOST, PORT = "10.100.1.152", 55555
+    # HOST, PORT = "10.100.0.53", 55555
+    REDIS_SERVER = '10.100.1.150'
+    REDIS_PORT = 6379
+    parser = argparse.ArgumentParser()
+
+    # parser.add_argument('imgs', type=str, nargs='+', help="Input images.")
+    parser.add_argument('--dlibFacePredictor', type=str, help="Path to dlib's face predictor.",
+                        default=os.path.join(dlibModelDir, "shape_predictor_68_face_landmarks.dat"))
+    parser.add_argument('--networkModel', type=str, help="Path to Torch network model.",
+                        default=os.path.join(openfaceModelDir, 'nn4.small2.v1.t7'))
+    parser.add_argument('--imgDim', type=int,
+                        help="Default image dimension.", default=96)
+    parser.add_argument('--verbose', action='store_true')
+
+    parser.add_argument('--cuda', action='store_true')
+
+    args = parser.parse_args()
+
+    align = openface.AlignDlib(args.dlibFacePredictor)
+    net = openface.TorchNeuralNet(args.networkModel, imgDim=args.imgDim, cuda=args.cuda)
+
+    redis_ready = False
+
+    try:
+        rds = redis.StrictRedis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
+
+        p = rds.pubsub()
+        p.subscribe('camera')
+        redis_ready = True
+
+    except:
+        redis_ready = False
+
+    (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
+    (le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
+
+    # Individual Guest Group
+    (le_iguest, clf_iguest) = pickle.load(open(baseDir + '/svm/classifier_iguest.pkl', 'r'))
+    (le_dbn_iguest, clf_dbn_iguest) = pickle.load(open(baseDir + '/dbn/classifier_iguest.pkl', 'r'))
+
+    # Overall Guest Group
+    # (le_oguest, clf_oguest) = pickle.load(open(baseDir + '/svm/classifier_oguest.pkl', 'r'))
+    # (le_dbn_oguest, clf_dbn_oguest) = pickle.load(open(baseDir + '/dbn/classifier_oguest.pkl', 'r'))
+
+    sock_ready = False
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((HOST, PORT))
+        sock_ready = True
+        # debug_print('Connected')
+    except:
+        sock_ready = False
+
     main()
 
