@@ -693,10 +693,10 @@ if __name__ == "__main__":
     openfaceModelDir = os.path.join(modelDir, 'openface')
     haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
     dlibDetector = dlib.get_frontal_face_detector()
-    label_list = [d for d in os.listdir(inputDir + '/user')]
+    label_list = [d for d in os.listdir(inputDir + '/user') if os.path.isdir(inputDir + '/user/' + d)]
     label_list.sort()
 
-    label_list_iguest = [d for d in os.listdir(inputDir + '/iguest')]
+    label_list_iguest = [d for d in os.listdir(inputDir + '/iguest') if os.path.isdir(inputDir + '/user/' + d)]
     label_list_iguest.sort()
 
     # label_list_oguest = [d for d in os.listdir(inputDir + '/oguest')]
