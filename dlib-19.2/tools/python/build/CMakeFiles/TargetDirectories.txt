@@ -1,0 +1,14 @@
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/install.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/list_install_components.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/rebuild_cache.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/dlib_.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/install/strip.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/install/local.dir
+/home/major/dlib-19.2/tools/python/build/CMakeFiles/edit_cache.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/rebuild_cache.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/install.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/list_install_components.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/dlib.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/install/local.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/install/strip.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/CMakeFiles/edit_cache.dir

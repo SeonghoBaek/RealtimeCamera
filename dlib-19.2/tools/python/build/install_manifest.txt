@@ -1,0 +1,1 @@
+/home/major/dlib-19.2/tools/python/../../python_examples/dlib.so

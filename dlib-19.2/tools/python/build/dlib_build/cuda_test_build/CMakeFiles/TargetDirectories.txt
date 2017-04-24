@@ -1,0 +1,3 @@
+/home/major/dlib-19.2/tools/python/build/dlib_build/cuda_test_build/CMakeFiles/edit_cache.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/cuda_test_build/CMakeFiles/rebuild_cache.dir
+/home/major/dlib-19.2/tools/python/build/dlib_build/cuda_test_build/CMakeFiles/cuda_test.dir
