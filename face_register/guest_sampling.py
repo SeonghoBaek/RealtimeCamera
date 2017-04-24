@@ -26,7 +26,7 @@ def guest_sampling(path, size):
 
 
 def user_sampling(path, size):
-    label_dir_list = [d for d in os.listdir(path) if d != 'Guest' and d != 'nobody']
+    label_dir_list = [d for d in os.listdir(path) if d != 'Guest' and d != 'Nobody']
     label_dir_size = len(label_dir_list)
     label_list = []
     sample_list = []

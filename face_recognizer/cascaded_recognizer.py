@@ -19,6 +19,8 @@ from operator import itemgetter
 import numpy as np
 import signal
 import sys
+import random
+
 
 def debug_print(str):
     if debug is True:
@@ -431,6 +433,13 @@ def initialize_rep_distance_list(embedding_path, min_list, mean_list, std_list, 
     class_labels.append(classes)
     embedding_list.append(ems)
 
+    for i in range(len(embedding_list)):
+        if len(embedding_list[i]) > 100:
+            random.shuffle(embedding_list[i])
+            embedding_list[i] = embedding_list[i][:100]
+            class_labels[i] = class_labels[i][:100]
+            #print len(embedding_list[i]), len(class_labels[i])
+
     # print len(class_labels)
 
     for c in range(len(class_labels)):
@@ -577,7 +586,7 @@ def main():
                                         candidate = person
                                         candidate_confidence = confidence
 
-                            elif candidate != 'Unknown' and candidate != 'nobody':
+                            elif candidate != 'Unknown' and candidate != 'Nobody':
                                 if person != 'User':
                                     if confidence >= threshold:
                                         candidate = person
@@ -627,7 +636,7 @@ def main():
 
                         if candidate_confidence > 0:
                             if sock_ready is True:
-                                if candidate != 'Unknown' and candidate != 'nobody':
+                                if candidate != 'Unknown' and candidate != 'Nobody':
                                     b_array = bytes()
                                     floatList = [left, right, top, bottom, candidate_confidence,
                                                  label_list.index(candidate)]
