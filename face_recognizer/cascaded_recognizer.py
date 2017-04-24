@@ -22,6 +22,22 @@ import sys
 import random
 
 
+class Logger(object):
+    def __init__(self):
+        self.terminal = sys.stdout
+        self.log = open("recognizer.log", "a")
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        #this flush method is needed for python 3 compatibility.
+        #this handles the flush command by doing nothing.
+        #you might want to specify some extra behavior here.
+        pass
+
+
 def debug_print(str):
     if debug is True:
         print(str)
@@ -655,6 +671,8 @@ def main():
 if __name__ == "__main__":
     os_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, handler)
+
+    sys.stdout = Logger()
 
     threshold = 0.9
     fn_threshold = 0.8
