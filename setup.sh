@@ -18,5 +18,15 @@ make -j4 > /dev/null
 
 echo "Done."
 
+echo "Create label data"
+
+pushd . > /dev/null
+cd face_detector/extractor/data/labels
+python make_labels.py
+popd > /dev/null
+
+echo "Please Read face_detector/models/README.txt"
+echo "Download pretrained FDDB face weights for YOLO in face_detector/models/"
+
 popd > /dev/null
 
