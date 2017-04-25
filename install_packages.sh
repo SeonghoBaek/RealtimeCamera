@@ -44,7 +44,7 @@ cd distro
 source ~/.bashrc
 for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do luarocks install $NAME; done
 
-cd ..
+cd ../RealtimeCamera
 
 cd openface
 ./models/get-models.sh
