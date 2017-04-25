@@ -46,6 +46,7 @@ for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do lua
 
 cd ../RealtimeCamera
 
+source ~/.bashrc
 cd openface
 ./models/get-models.sh
 sudo pip install -r requirements.txt
