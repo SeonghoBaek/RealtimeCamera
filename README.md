@@ -1,4 +1,13 @@
-Requirement
+#**Open DRUWA**
+*Open Deep Realtime User Welcoming Assistant*
+
+Realtime face detection & verification using Webcam.
+
+[seonghobaek@gmail.com](seonghobaek@gmail.com)
+
+[AIRI - AI Research Institute](http://airi.kr)
+
+*Requirement*
 
 	- cmake / gcc,g++ / python 2.7 / pip
 	- CUDA/CUDNN
