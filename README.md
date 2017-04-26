@@ -8,7 +8,7 @@ Realtime face detection & verification using Webcam.
 
 [AIRI - AI Research Institute](http://airi.kr)
 
-*Requirement*
+## *Requirement*
 
 	- cmake / gcc,g++ / python 2.7 / pip
 	- CUDA/CUDNN
@@ -23,19 +23,18 @@ Realtime face detection & verification using Webcam.
 		- Case of building Native Openface 
 	- dlib
 
-CUDA/CUDNN
+## *CUDA/CUDNN*
 
     - NVidia Wed Site.
     - CUDA 8.0 / CUDNN 5.1 
 
-
-Installation
+## *Installation*
 
         Change current directory to RealtimeCamera
         Run install_packages.sh
         Run setup.sh
 
-Run
+## *Run*
 
         Run Redis Server
             Admit external access(Edit redis.conf)
@@ -54,9 +53,9 @@ Run
         Run face_recognizer/cuda_recognizer.sh
 
 
-Training
+## *Training*
 
         TDB
         
-Enjoy.
+## Enjoy.
 
