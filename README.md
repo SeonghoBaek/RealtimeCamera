@@ -18,7 +18,7 @@ Realtime face detection & verification using Webcam.
 	- Darknet
 		- C/C++ dnn framework
 	- Openface
-		- You can user docker image which does not support gpgpu
+		- You can use docker image which does not support gpgpu
 	- Torch
 		- Case of building Native Openface 
 	- dlib
