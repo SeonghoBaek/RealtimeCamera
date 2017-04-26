@@ -1,4 +1,5 @@
-#**Open DRUWA**
+# **Open DRUWA**
+
 *Open Deep Realtime User Welcoming Assistant*
 
 Realtime face detection & verification using Webcam.
