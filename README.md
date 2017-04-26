@@ -15,9 +15,8 @@ Requirement
 
 CUDA/CUDNN
 
-NVidia Wed Site.
-
-CUDA 8.0 / CUDNN 5.1 
+    - NVidia Wed Site.
+    - CUDA 8.0 / CUDNN 5.1 
 
 
 Installation
