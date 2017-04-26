@@ -4,7 +4,7 @@
 
 Realtime face detection & verification using Webcam.
 
-seonghobaek@gmail.com
+*seonghobaek@gmail.com*
 
 [AIRI - AI Research Institute](http://airi.kr)
 
