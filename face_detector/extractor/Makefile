@@ -2,8 +2,9 @@ GPU=1
 CUDNN=1
 OPENCV=1
 REDIS=1
-
-DEBUG=1
+SHOW_WINDOW=1
+SUPPORT_SECOND_CAMERA=0
+DEBUG=0
 
 ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
       -gencode arch=compute_30,code=sm_30 \
@@ -54,6 +55,16 @@ ifeq ($(REDIS), 1)
 COMMON+= -DREDIS -I/usr/local/include/hiredis
 CFLAGS+= -DREDIS 
 LDFLAGS+= -lhiredis
+endif
+
+ifeq ($(SUPPORT_SECOND_CAMERA), 1)
+COMMON+= -DSUPPORT_SECOND_CAMERA
+CFLAGS+= -DSUPPORT_SECOND_CAMERA
+endif
+
+ifeq ($(SHOW_WINDOW), 1)
+COMMON+= -DSHOW_WINDOW
+CFLAGS+= -DSHOW_WINDOW
 endif
 
 COMMON += -I../identifier -I../sparse

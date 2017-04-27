@@ -31,10 +31,10 @@ void draw_box_width(image a, int x1, int y1, int x2, int y2, int w, float r, flo
 void draw_bbox(image a, box bbox, int w, float r, float g, float b);
 void draw_label(image a, int r, int c, image label, const float *rgb);
 void write_label(image a, int r, int c, image *characters, char *string, float *rgb);
-void draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **labels, int classes);
+int  draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **labels, int classes);
 void draw_and_save_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **labels, int classes);
 #ifdef REDIS
-void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **labels, int classes);
+int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **labels, int classes);
 #endif
 image image_distance(image a, image b);
 void scale_image(image m, float s);

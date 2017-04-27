@@ -475,21 +475,21 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
             cur = (double)_time.tv_sec + (double)_time.tv_usec * .000001;
         }
 
-        if (this->mLastBridgeSendTime == 0)
+        LOCK(this->mBridgeLock)
         {
+            if (this->mLastBridgeSendTime == 0) {
+                this->mLastBridgeSendTime = cur;
+            } else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL) {
+                LOGI("Too Short Brigde Time Interval: %d\n", (int) (cur - this->mLastBridgeSendTime));
+                return -1;
+            }
+
+            //LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+
             this->mLastBridgeSendTime = cur;
         }
-        else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL)
-        {
-            LOGI("Too Short Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
-            return -1;
-        }
 
-        //LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
-
-        this->mLastBridgeSendTime = cur;
-
-        if (gTTSRedisContext)
+        if (gTTSRedisContext && labelIndex > -1)
         {
             char *name = this->mpLabels[labelIndex].getLabel();
             redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
@@ -504,7 +504,7 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
     }
     else
     {
-        if (gTTSRedisContext)
+        if (gTTSRedisContext && labelIndex > -1)
         {
             char *name = this->mpLabels[labelIndex].getLabel();
             redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);

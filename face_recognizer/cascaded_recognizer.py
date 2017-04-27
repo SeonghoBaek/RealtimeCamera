@@ -664,8 +664,8 @@ def main():
 
                 else:
                     rds.set('frame', '1')
-    except:
-        print 'Exit'
+    except Exception, e:
+        print 'Exit: ', str(e)
 
 
 if __name__ == "__main__":
@@ -693,10 +693,10 @@ if __name__ == "__main__":
     openfaceModelDir = os.path.join(modelDir, 'openface')
     haarCascadeModelDir = '/usr/local/share/OpenCV/haarcascades/'
     dlibDetector = dlib.get_frontal_face_detector()
-    label_list = [d for d in os.listdir(inputDir + '/user') if os.path.isdir(inputDir + '/user/' + d)]
+    label_list = [d for d in os.listdir(inputDir + '/user') if os.path.isdir(inputDir + '/user/' + d) is True]
     label_list.sort()
 
-    label_list_iguest = [d for d in os.listdir(inputDir + '/iguest') if os.path.isdir(inputDir + '/user/' + d)]
+    label_list_iguest = [d for d in os.listdir(inputDir + '/iguest') if os.path.isdir(inputDir + '/user/' + d) is True]
     label_list_iguest.sort()
 
     # label_list_oguest = [d for d in os.listdir(inputDir + '/oguest')]
@@ -748,7 +748,7 @@ if __name__ == "__main__":
 
     try:
         rds = redis.StrictRedis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
-
+        
         p = rds.pubsub()
         p.subscribe('camera')
         redis_ready = True
@@ -773,6 +773,7 @@ if __name__ == "__main__":
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((HOST, PORT))
         sock_ready = True
+
         # debug_print('Connected')
     except:
         sock_ready = False

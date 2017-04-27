@@ -19,7 +19,7 @@
 #define LABEL_DIRECTORY_IGUEST "../face_register/input/iguest"
 #define LABEL_DIRECTORY_OGUEST "../face_register/input/oguest"
 
-#define LABEL_INVALIDATE_STATE -2
+#define LABEL_INVALIDATE_STATE -1
 #define LABEL_READY_STATE -1
 #define LABEL_VALID_STATE 1
 
@@ -138,6 +138,7 @@ private:
     int             mCurrentFrame;
     int             mNextFrame;
     Mutex_t         mFrameLock;
+    Mutex_t         mBridgeLock;
     int             mNumLabel;
     Label           *mpLabels;
     LabelListItem   *mpActiveLabelList;
@@ -162,6 +163,7 @@ public:
         mCurrentFrame = -1;
         mNextFrame = -1;
         mFrameLock = Lock::createMutex();
+        mBridgeLock = Lock::createMutex();
         mNumLabel = 0; // TO DO: Load from file
         mpActiveLabelList = NULL;
         mpLabels = NULL;
@@ -177,6 +179,11 @@ public:
         if (mFrameLock)
         {
             Lock::deleteMutex(this->mFrameLock);
+        }
+
+        if (mBridgeLock)
+        {
+            Lock::deleteMutex(this->mBridgeLock);
         }
 
         if (mpLooper)
@@ -223,7 +230,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && pDirent->d_name[0] != '.')
                 {
                     if (strcmp(pDirent->d_name, unknown)) {
                         numLabels++;
@@ -250,7 +257,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && pDirent->d_name[0] != '.')
                 {
                     if (strcmp(pDirent->d_name, unknown)) {
                         numLabels++;
@@ -277,7 +284,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY, pDirent->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && pDirent->d_name[0] != '.')
                 {
                     if (strcmp(pDirent->d_name, unknown)) {
                         numLabels++;
@@ -307,7 +314,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY, namelist[i]->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && namelist[i]->d_name[0] != '.')
                 {
                     //printf("%s\n", namelist[i]->d_name);
                     if (strcmp(namelist[i]->d_name, unknown))
@@ -334,7 +341,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY_IGUEST, namelist[i]->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && namelist[i]->d_name[0] != '.')
                 {
                     //printf("%s\n", namelist[i]->d_name);
                     if (strcmp(namelist[i]->d_name, unknown))
@@ -361,7 +368,7 @@ public:
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY_OGUEST, namelist[i]->d_name);
                 stat(temp, &statbuf);
 
-                if (S_ISDIR(statbuf.st_mode))
+                if (S_ISDIR(statbuf.st_mode) && namelist[i]->d_name[0] != '.')
                 {
                     //printf("%s\n", namelist[i]->d_name);
                     if (strcmp(namelist[i]->d_name, unknown))

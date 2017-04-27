@@ -55,6 +55,10 @@ void version_up()
     pGVCF->versionUp();
 }
 
+int door_open() {
+    return pGVCF->fireUserEvent(-1);
+}
+
 #ifdef USE_SRC
 void train_sparse()
 {

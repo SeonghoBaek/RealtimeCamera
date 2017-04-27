@@ -200,7 +200,7 @@ float   gBoxRGB[] = {0.95, 0.95, 0.95};
 
 #define UPLOAD_STEP 4
 
-void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
+int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
 {
     int     i;
     int     n = 0;
@@ -208,6 +208,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     int     classes = 1;
     int     need_reset_label_check_info = 1;
     char    img_file_name[256];
+    int     num_object = 0;
 
     redisReply *pReply = NULL;
 
@@ -240,10 +241,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
         {
             int width = im.h * .012;
 
-            if (0) {
-                width = pow(prob, 1. / 2.) * 10 + 1;
-                alphabet = 0;
-            }
+            num_object++;
 
             //printf("Prob: %f\n", prob);
 
@@ -318,7 +316,7 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
                 if (p_img_file == NULL) {
                     printf("%s image null.\n", filename);
 
-                    return;
+                    return -1;
                 }
 
                 fseek(p_img_file, 0, SEEK_END);
@@ -389,6 +387,8 @@ void draw_and_send_detections(redisContext *pRC, image im, int num, float thresh
     }
 
     free_image(original_image);
+
+    return num_object;
 }
 #endif
 int g_pic_seq = 0;
@@ -420,11 +420,13 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
             float blue = get_color(0,offset,classes);
             float rgb[3];
 
+
             //width = prob*20+2;
 
             rgb[0] = red;
             rgb[1] = green;
             rgb[2] = blue;
+
             box b = boxes[i];
 
             int left  = (b.x-b.w/2.)*im.w;
@@ -481,9 +483,10 @@ void draw_and_save_detections(image im, int num, float thresh, box *boxes, float
     free_image(original_image);
 }
 
-void draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
+int draw_detections(image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int classes)
 {
     int i;
+    int num_object = 0;
 
     for(i = 0; i < num; ++i){
         int class = max_index(probs[i], classes);
@@ -492,11 +495,9 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
 
             int width = im.h * .012;
 
-            if(0){
-                width = pow(prob, 1./2.)*10+1;
-                alphabet = 0;
-            }
+            num_object++;
 
+            /*
             printf("%s: %.0f%%\n", names[class], prob*100);
             int offset = class*123457 % classes;
             float red = get_color(2,offset,classes);
@@ -509,6 +510,8 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             rgb[0] = red;
             rgb[1] = green;
             rgb[2] = blue;
+            */
+
             box b = boxes[i];
 
             int left  = (b.x-b.w/2.)*im.w;
@@ -516,6 +519,14 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             int top   = (b.y-b.h/2.)*im.h;
             int bot   = (b.y+b.h/2.)*im.h;
 
+            //printf("width: %d, height: %d\n", right - left, bot - top);
+
+            if (right-left > 100)
+            {
+                printf("Enough Face Size\n");
+                door_open();
+            }
+            /*
             if(left < 0) left = 0;
             if(right > im.w-1) right = im.w-1;
             if(top < 0) top = 0;
@@ -527,8 +538,11 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
                 image label = get_label(alphabet, names[class], (im.h*.03)/10);
                 draw_label(im, top + width, left, label, rgb);
             }
+            */
         }
     }
+
+    return num_object;
 }
 
 void transpose_image(image im)
