@@ -38,7 +38,7 @@ name_dict = {'BaekSeongho': '백 성호', 'HyunDaewon': '현 대원', 'JangYoons
              'KimTaehee': '김 태희', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
              'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
              'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
-             'SeoByungrak': '서 병락', 'Guest': '손님'}
+             'SeoByungrak': '서 병락', 'Guest': '손님', 'ChoiJung': '최 정', 'JungSungkyu': '정 성규', 'LeeManjae': '이 만재'}
 
 try:
     rds = redis.StrictRedis(host=HOST, port=PORT, db=0)
@@ -100,9 +100,7 @@ def main():
                         label = data
 
                         if label is 'warning':
-                            path = '/var/tmp/warning.mp3'
-                            tts = gTTS(text='보안 상 이유로 작동되지 않습니다.', lang='ko')
-                            tts.save(path)
+                            path = './voice/warning.mp3'
                             p = subprocess.Popen(['play', path])
                             p.communicate()
 
@@ -117,8 +115,8 @@ def main():
             except subprocess.CalledProcessError:
                 print('\nSubprocess Error')
 
-    except:
-        print('\nRedis Disconnected')
+    except Exception, e:
+        print 'Exit: ', str(e)
 
 if __name__ == "__main__":
     main()

@@ -276,6 +276,43 @@ void do_nms_sort(box *boxes, float **probs, int total, int classes, float thresh
     free(s);
 }
 
+
+int do_nms_with_threshold(box *boxes, float **probs, int total, int classes, float iou, float threshold)
+{
+    int i, j, k;
+    int find_object = 0;
+
+    for(i = 0; i < total; ++i){
+        int any = 0;
+        for(k = 0; k < classes; ++k) any = any || (probs[i][k] > threshold);
+        if(!any)
+        {
+            continue;
+        }
+
+        find_object = 1;
+
+        for(j = i+1; j < total; ++j)
+        {
+            if (box_iou(boxes[i], boxes[j]) > iou)
+            {
+                for(k = 0; k < classes; ++k){
+                    if (probs[i][k] < probs[j][k])
+                    {
+                        probs[i][k] = 0;
+                    }
+                    else
+                    {
+                        probs[j][k] = 0;
+                    }
+                }
+            }
+        }
+    }
+
+    return find_object;
+}
+
 void do_nms(box *boxes, float **probs, int total, int classes, float thresh)
 {
     int i, j, k;

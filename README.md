@@ -1,14 +1,4 @@
-# **Open DRUWA**
-
-*Open Deep Realtime User Welcoming Assistant*
-
-Realtime face detection & verification using Webcam.
-
-*seonghobaek@gmail.com*
-
-[AIRI - AI Research Institute](http://airi.kr)
-
-## *Requirement*
+Requirement
 
 	- cmake / gcc,g++ / python 2.7 / pip
 	- CUDA/CUDNN
@@ -18,23 +8,24 @@ Realtime face detection & verification using Webcam.
 	- Darknet
 		- C/C++ dnn framework
 	- Openface
-		- You can use docker image which does not support gpgpu
+		- You can user docker image which does not support gpgpu
 	- Torch
 		- Case of building Native Openface 
 	- dlib
 
-## *CUDA/CUDNN*
+CUDA/CUDNN
 
     - NVidia Wed Site.
     - CUDA 8.0 / CUDNN 5.1 
 
-## *Installation*
+
+Installation
 
         Change current directory to RealtimeCamera
         Run install_packages.sh
         Run setup.sh
 
-## *Run*
+Run
 
         Run Redis Server
             Admit external access(Edit redis.conf)
@@ -53,9 +44,9 @@ Realtime face detection & verification using Webcam.
         Run face_recognizer/cuda_recognizer.sh
 
 
-## *Training*
+Training
 
         TDB
         
-## Enjoy.
+Enjoy.
 

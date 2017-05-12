@@ -30,7 +30,7 @@ cd ../
 #tar -xvf dlib-19.2.tar
 cd dlib-19.2
 mkdir build
-cd build
+cd build 
 cmake .. -DUSE_AVX_INSTRUCTIONS=1;cmake --build
 sudo make install
 cd ..
@@ -45,9 +45,9 @@ cd distro
 source ~/.bashrc
 for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do luarocks install $NAME; done
 
+source ~/.bashrc
 cd ../RealtimeCamera
 
-source ~/.bashrc
 cd openface
 ./models/get-models.sh
 sudo pip install -r requirements.txt

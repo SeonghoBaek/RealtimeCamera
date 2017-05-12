@@ -27,7 +27,7 @@
 #include "identifier.h"
 
 #define MIN_WAIT_TIME 2
-#define MAX_WAIT_TIME 500
+#define MAX_WAIT_TIME 200
 #define STEP_WAIT_TIME 30
 
 image get_image_from_stream(CvCapture *cap);
@@ -101,6 +101,7 @@ void *detect_second_camera_in_thread(void *ptr)
     float *prediction;
     int num_bbox = 0;
     int num_object = 0;
+    int find_object = 0;
 
     l = net.layers[net.n-1];
     X = det_s_in.data;
@@ -119,7 +120,11 @@ void *detect_second_camera_in_thread(void *ptr)
         error("Last layer must produce detections\n");
     }
 
-    if (nms > 0) do_nms(boxes_in, probs_in, l.w*l.h*l.n, l.classes, nms);
+    //if (nms > 0) do_nms(boxes_in, probs_in, l.w*l.h*l.n, l.classes, nms);
+    if (nms > 0)
+    {
+        find_object = do_nms_with_threshold(boxes_in, probs_in, l.w*l.h*l.n, l.classes, nms, camera_thresh);
+    }
 
     num_bbox = l.w*l.h*l.n;
 
@@ -128,6 +133,17 @@ void *detect_second_camera_in_thread(void *ptr)
     camera_index_in = (camera_index_in + 1)%FRAMES;
 
     //printf("num bbox: %d\n", num_bbox);
+
+    if (find_object == 0)
+    {
+        if (gSecondDetectDelayTime < MAX_WAIT_TIME)
+        {
+            gSecondDetectDelayTime += STEP_WAIT_TIME;
+        }
+        else gSecondDetectDelayTime = MAX_WAIT_TIME;
+
+        return 0;
+    }
 
     num_object = draw_detections(det_in, num_bbox, camera_thresh, boxes_in, probs_in, camera_names, camera_alphabet, 1);
 
@@ -170,6 +186,7 @@ void *detect_in_thread(void *ptr)
     float *prediction;
     int num_bbox = 0;
     int num_object = 0;
+    int find_object = 0;
 
     l = net.layers[net.n-1];
     X = det_s.data;
@@ -188,7 +205,11 @@ void *detect_in_thread(void *ptr)
         error("Last layer must produce detections\n");
     }
 
-    if (nms > 0) do_nms(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+    //if (nms > 0) do_nms(boxes, probs, l.w*l.h*l.n, l.classes, nms);
+    if (nms > 0)
+    {
+        find_object = do_nms_with_threshold(boxes, probs, l.w*l.h*l.n, l.classes, nms, camera_thresh);
+    }
 
     num_bbox = l.w*l.h*l.n;
 
@@ -197,6 +218,16 @@ void *detect_in_thread(void *ptr)
     camera_index = (camera_index + 1)%FRAMES;
 
     //printf("num bbox: %d\n", num_bbox);
+    if (find_object == 0)
+    {
+        if (gFirstDetectDelayTime < MAX_WAIT_TIME)
+        {
+            gFirstDetectDelayTime += STEP_WAIT_TIME;
+        }
+        else gFirstDetectDelayTime = MAX_WAIT_TIME;
+
+        return 0;
+    }
 
 #ifdef REDIS
     num_object = draw_and_send_detections(gRedisContext, det, num_bbox, camera_thresh, boxes, probs, camera_names, camera_alphabet, gFrameNum);
@@ -398,7 +429,7 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
         if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
         if (pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
-        if (gFrameNum % 30 == 0)
+        if (gFrameNum % 5 == 0)
         {
             save_image(disp, "../robot/node/public/screenshot");
         }
