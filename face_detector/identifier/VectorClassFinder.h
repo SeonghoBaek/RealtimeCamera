@@ -222,8 +222,8 @@ public:
         {
             int numLabels = 0;
 
-            readdir(pDp); // .
-            readdir(pDp); // ..
+            //readdir(pDp); // .
+            //readdir(pDp); // ..
 
             while (pDirent = readdir(pDp))
             {
@@ -249,8 +249,8 @@ public:
         {
             int numLabels = 0;
 
-            readdir(pDp); // .
-            readdir(pDp); // ..
+            //readdir(pDp); // .
+            //readdir(pDp); // ..
 
             while (pDirent = readdir(pDp))
             {
@@ -309,7 +309,7 @@ public:
             perror("scandir");
         else
         {
-            for (int i = 2; i < n; i++)
+            for (int i = 0; i < n; i++)
             {
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY, namelist[i]->d_name);
                 stat(temp, &statbuf);
@@ -336,7 +336,7 @@ public:
             perror("scandir");
         else
         {
-            for (int i = 2; i < n; i++)
+            for (int i = 0; i < n; i++)
             {
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY_IGUEST, namelist[i]->d_name);
                 stat(temp, &statbuf);
@@ -363,7 +363,7 @@ public:
             perror("scandir");
         else
         {
-            for (int i = 2; i < n; i++)
+            for (int i = 0; i < n; i++)
             {
                 sprintf(temp, "%s/%s", LABEL_DIRECTORY_OGUEST, namelist[i]->d_name);
                 stat(temp, &statbuf);

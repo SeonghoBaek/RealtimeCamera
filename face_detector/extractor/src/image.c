@@ -519,9 +519,9 @@ int draw_detections(image im, int num, float thresh, box *boxes, float **probs, 
             int top   = (b.y-b.h/2.)*im.h;
             int bot   = (b.y+b.h/2.)*im.h;
 
-            //printf("width: %d, height: %d\n", right - left, bot - top);
+            printf("width: %d, height: %d\n", right - left, bot - top);
 
-            if (right-left > 100)
+            if (right-left > 60)
             {
                 printf("Enough Face Size\n");
                 door_open();

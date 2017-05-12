@@ -4,14 +4,14 @@ import random
 
 
 def guest_sampling(path, size):
-    label_dir_list = [d for d in os.listdir(path) if d != 'User']
+    label_dir_list = [d for d in os.listdir(path) if os.path.isdir(path+d) and d != 'User']
     label_dir_size = len(label_dir_list)
     label_list = []
     sample_list = []
     index = 0
 
     for d in label_dir_list:
-        listing = [path + d + '/' + f for f in os.listdir(path + d)]
+        listing = [path + d + '/' + f for f in os.listdir(path + d) if f[0] != '.']
         random.shuffle(listing)
         label_list.append(listing)
         index += 1
@@ -26,14 +26,14 @@ def guest_sampling(path, size):
 
 
 def user_sampling(path, size):
-    label_dir_list = [d for d in os.listdir(path) if d != 'Guest' and d != 'Nobody']
+    label_dir_list = [d for d in os.listdir(path) if d != 'Guest' and d != 'Nobody' and os.path.isdir(path + d)]
     label_dir_size = len(label_dir_list)
     label_list = []
     sample_list = []
     index = 0
 
     for d in label_dir_list:
-        listing = [path + d + '/' + f for f in os.listdir(path + d)]
+        listing = [path + d + '/' + f for f in os.listdir(path + d) if f[0] != '.']
         random.shuffle(listing)
         label_list.append(listing)
         index += 1

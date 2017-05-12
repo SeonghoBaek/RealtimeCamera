@@ -218,7 +218,7 @@ void FastDALM(
 		}
 	} while (!converged_main);
 
-	if (verbose) printf("==== CONVERGED ==== \n", nIter);
+	if (verbose) printf("==== CONVERGED ==== \n");
 
 	delete [] tmp;
 	delete [] g;
