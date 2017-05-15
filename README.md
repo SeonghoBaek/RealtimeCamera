@@ -76,7 +76,6 @@ Training
                 First target class
             input/iguest
                 Second target class
-                
         Run face_register/train.sh
         
         TDB
