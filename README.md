@@ -43,9 +43,42 @@ Run
             
         Run face_recognizer/cuda_recognizer.sh
 
+Directory Structure
 
+        face_detector
+            extractor
+                YOLO based on darknet
+                Camera Control based on OpenCV
+                Face data redis publish
+            identifier
+                Person label(eg.name) selection
+                Face tracking
+        face_recognizer
+             Face data redis subscriber
+             Face alignment with dlib python
+             Vector distance checker
+             DBN classifier inference
+             SVM classifier inference
+             TTS engine(Google Voice)
+        face_register
+             Supervised image training
+             DBN with LDA dimension reduction
+             SVM(RBF) fine tunning
+        robot
+             Arduino controller(Door open)
+             node.js event receiver
+             
 Training
 
+        Input data
+            Place face images in face_register/input/user
+            input/user
+                First target class
+            input/iguest
+                Second target class
+                
+        Run face_register/train.sh
+        
         TDB
         
 Enjoy.
