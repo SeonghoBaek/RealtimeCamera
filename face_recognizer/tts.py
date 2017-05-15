@@ -99,18 +99,21 @@ def main():
                     if data > 1L:
                         label = data
 
-                        if label is 'warning':
-                            path = './voice/warning.mp3'
-                            p = subprocess.Popen(['play', path])
-                            p.communicate()
+                try:
+                    if label == 'warning':
+                        path = './voice/warning.mp3'
 
-                        else:
-                            now = datetime.datetime.now()
-                            path = get_voice(label, now.hour)
-                            p = subprocess.Popen(['play', path])
-                            p.communicate()
+                    else:
+                        now = datetime.datetime.now()
+                        path = get_voice(label, now.hour)
 
-                        print('Play done')
+                    p = subprocess.Popen(['play', path])
+                    p.communicate()
+
+                    print('Play done')
+
+                except Exception, e:
+                        print 'Exit: ', str(e)
 
             except subprocess.CalledProcessError:
                 print('\nSubprocess Error')
