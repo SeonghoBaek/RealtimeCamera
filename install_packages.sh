@@ -9,6 +9,8 @@ sudo apt-get install -y libevent-dev
 git clone https://github.com/opencv/opencv.git
 git clone https://github.com/opencv/opencv_contrib.git
 
+pushd .
+
 cd opencv
 mkdir build
 cd build
@@ -18,25 +20,39 @@ cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DOPENCV_EXTR
 make -j8
 sudo make install
 
-cd ../../
+popd
+
+pushd .
+
 git clone https://github.com/redis/hiredis.git
 cd hiredis
 make -j4;sudo make install
 
 sudo apt-get install libopenblas-dev liblapack-dev liblapacke-dev
 
-cd ../
+popd
+
+pushd .
+
 #bunzip2 dlib-19.2.tar.bz2
 #tar -xvf dlib-19.2.tar
 cd dlib-19.2
+
+pushd .
+
 mkdir build
 cd build 
 cmake .. -DUSE_AVX_INSTRUCTIONS=1;cmake --build
 sudo make install
-cd ..
+
+popd
+
 sudo python setup.py install --yes USE_AVX_INSTRUCTIONS
 
-cd ..
+popd
+
+pushd .
+
 git clone https://github.com/torch/distro.git --recursive
 
 cd distro
@@ -46,7 +62,10 @@ source ~/.bashrc
 for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do luarocks install $NAME; done
 
 source ~/.bashrc
-cd ../RealtimeCamera
+
+popd
+
+pushd .
 
 cd openface
 ./models/get-models.sh
@@ -54,3 +73,5 @@ sudo pip install -r requirements.txt
 sudo python setup.py install
 sudo pip install -r training/requirements.txt
 sudo pip install redis
+
+popd
