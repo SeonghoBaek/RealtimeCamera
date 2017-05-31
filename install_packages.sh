@@ -73,5 +73,6 @@ sudo pip install -r requirements.txt
 sudo python setup.py install
 sudo pip install -r training/requirements.txt
 sudo pip install redis
+sudo pip install gtts
 
 popd
