@@ -266,12 +266,18 @@ def infer(fileName, mode):
 
     #c = np.array([confidence_dbn, confidence])
 
-    avgt = np.mean([confidence_dbn, confidence])
+    #avgt = np.mean([confidence_dbn, confidence])
+
+    leaky = 0.7
+
+    avgt = leaky * confidence_dbn + (1 - leaky) * confidence
 
     print '   AVG: ', avgt
 
+    margin = 0 #0.05
+
     if mode == 'user':
-        if avgt < threshold + 0.05:
+        if avgt < threshold + margin:
             #if confidence > fn_threshold:
             if avgt > fn_threshold:
                 dist_list = []
@@ -310,7 +316,7 @@ def infer(fileName, mode):
         else:
             avgt = confidence
 
-        if avgt < threshold + 0.05:
+        if avgt < threshold + margin:
             if avgt > 0.5:  #loose limit for guest group
                 dist_list = []
 
