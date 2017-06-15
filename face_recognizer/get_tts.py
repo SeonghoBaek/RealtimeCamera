@@ -19,14 +19,15 @@ name_list = ['BaekSeongho', 'HyunDaewon', 'JangYoonseok', 'KimDaeseoung', 'KimMi
              'KimTaehee', 'KoAhra', 'KoMinsam',
              'LeeKwanghee', 'LeeSanghun', 'LeeYuni',
              'OhSechang', 'ParkDaeyoung', 'RohHyungki',
-             'SeoByungrak', 'Guest', 'ChoiJung', 'JungSungkyu', 'LeeManjae']
+             'SeoByungrak', 'Guest', 'ChoiJung', 'JungSungkyu', 'LeeManjae', 'KangBoyoung']
 
 name_dict = {'BaekSeongho': '백 성호님', 'HyunDaewon': '현 대원님', 'JangYoonseok': '장 윤석님', 'KimDaeseoung': '김 대승님', 'KimMina': '김 미나님', 'KimHwiyoung': '김 휘영님',
              'KimJinhyung': '김 진형님', 'KimKeeyoung': '김 기영님', 'KimSeokwon': '김 석원님', 'KimSeongphyo': '김 성표님',
              'KimTaehee': '김 태희님', 'KimYonbe': '김 연배님', 'KoAhra': '고 아라님', 'KoMinsam': '고 민삼님',
              'LeeHyungyu': '이 현규님', 'LeeKwanghee': '이 광희님', 'LeeSanghun': '이 상훈님', 'LeeYuni': '이 유니님',
              'NamKyungpil': '남 경필님', 'OhSechang': '오 세창님', 'ParkDaeyoung': '박 대영님','RohHyungki': '노 형기님',
-             'SeoByungrak': '서 병락님', 'Guest': '손님', 'ChoiJung': '최 정님', 'JungSungkyu': '정 성규님', 'LeeManjae': '이 만재님'}
+             'SeoByungrak': '서 병락님', 'Guest': '손님', 'ChoiJung': '최 정님', 'JungSungkyu': '정 성규님', 'LeeManjae': '이 만재님',
+             'KangBoyoung': '강 보영님'}
 
 sentences_A = ['좋은 아침이에요', '커피 한 잔 하세요', '좋은 하루 되세요', '더 웃으세요', '들어와요', '화이팅!', '멋지시네요',
                '즐거운 하루 되세요', '조용한 물이 깊이 흐릅니다.', '지혜는 고통속에 있습니다.', '힘 찬 하루 되세요', '굿모닝', '반가워요', '어서오세요', '옷이 비싸보이네요',

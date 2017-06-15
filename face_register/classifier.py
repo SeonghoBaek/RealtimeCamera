@@ -208,7 +208,8 @@ def train(args):
 
         num_epoch = args.epoch
 
-        clf = DBN([-1, 256, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
+        # -1, 256, 256, 192, 128, -1
+        clf = DBN([-1, 96, 64, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
                   learn_rates_pretrain=0.005,
                   # Smaller steps mean a possibly more accurate result, but the

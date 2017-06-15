@@ -271,6 +271,7 @@ def infer(fileName, mode):
     leaky = 0.7
 
     avgt = leaky * confidence_dbn + (1 - leaky) * confidence
+    confidence = avgt
 
     print '   AVG: ', avgt
 

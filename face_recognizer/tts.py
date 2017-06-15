@@ -38,7 +38,8 @@ name_dict = {'BaekSeongho': '백 성호', 'HyunDaewon': '현 대원', 'JangYoons
              'KimTaehee': '김 태희', 'KoAhra': '고 아라', 'KoMinsam': '고 민삼',
              'LeeKwanghee': '이 광희', 'LeeSanghun': '이 상훈', 'LeeYuni': '이 유니',
              'OhSechang': '오 세창', 'ParkDaeyoung': '박 대영','RohHyungki': '노 형기',
-             'SeoByungrak': '서 병락', 'Guest': '손님', 'ChoiJung': '최 정', 'JungSungkyu': '정 성규', 'LeeManjae': '이 만재'}
+             'SeoByungrak': '서 병락', 'Guest': '손님', 'ChoiJung': '최 정', 'JungSungkyu': '정 성규', 'LeeManjae': '이 만재',
+             'KangBoyoung': '강 보영'}
 
 try:
     rds = redis.StrictRedis(host=HOST, port=PORT, db=0)
@@ -107,10 +108,10 @@ def main():
                                 now = datetime.datetime.now()
                                 path = get_voice(label, now.hour)
 
-                                p = subprocess.Popen(['play', path])
-                                p.communicate()
+                            p = subprocess.Popen(['play', path])
+                            p.communicate()
 
-                                print('Play done')
+                            print('Play done')
 
                         except Exception, e:
                                 print 'Exit: ', str(e)
