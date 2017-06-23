@@ -440,11 +440,37 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
         curr_time = time(NULL);
         curr_tm = localtime(&curr_time);
 
-        if (curr_tm->tm_hour < 8 || curr_tm->tm_hour > 19)
+        if (gettimeofday(&_time,NULL))
+        {
+            cur =  0;
+        }
+        else
+        {
+            cur = (double)_time.tv_sec + (double)_time.tv_usec * .000001;
+        }
+
+        LOCK(this->mBridgeLock)
+        {
+            if (this->mLastBridgeSendTime == 0)
+            {
+                this->mLastBridgeSendTime = cur;
+            }
+            else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL)
+            {
+                LOGI("Too Short Brigde Time Interval: %d\n", (int) (cur - this->mLastBridgeSendTime));
+                return -1;
+            }
+
+            //LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
+
+            this->mLastBridgeSendTime = cur;
+        }
+
+        if (curr_tm->tm_hour < 8 || curr_tm->tm_hour > 17)
         {
             LOGI("Do not open door for sequrity\n");
 
-            if (gTTSRedisContext)
+            if (gTTSRedisContext && labelIndex > -1)
             {
                 char *name = "warning";
                 redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
@@ -457,36 +483,13 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
         {
             LOGI("Do not open door for security\n");
 
-            if (gTTSRedisContext)
+            if (gTTSRedisContext && labelIndex > -1)
             {
                 char *name = "warning";
                 redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
             }
 
             return 0;
-        }
-
-        if (gettimeofday(&_time,NULL))
-        {
-            cur =  0;
-        }
-        else
-        {
-            cur = (double)_time.tv_sec + (double)_time.tv_usec * .000001;
-        }
-
-        LOCK(this->mBridgeLock)
-        {
-            if (this->mLastBridgeSendTime == 0) {
-                this->mLastBridgeSendTime = cur;
-            } else if (cur - this->mLastBridgeSendTime < BRIDGE_INTERVAL) {
-                LOGI("Too Short Brigde Time Interval: %d\n", (int) (cur - this->mLastBridgeSendTime));
-                return -1;
-            }
-
-            //LOGI("Brigde Time Interval: %d\n", (int)(cur - this->mLastBridgeSendTime));
-
-            this->mLastBridgeSendTime = cur;
         }
 
         if (gTTSRedisContext && labelIndex > -1)
