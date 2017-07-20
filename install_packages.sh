@@ -59,7 +59,7 @@ cd distro
 ./install-deps
 ./install.sh
 source ~/.bashrc
-for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do luarocks install $NAME; done
+for NAME in dpnn nn optim optnet csvigo cutorch cunn fblualib torchx tds; do install/bin/luarocks install $NAME; done
 
 source ~/.bashrc
 
