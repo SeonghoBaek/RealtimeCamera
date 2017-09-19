@@ -11,7 +11,7 @@ import subprocess
 import random
 from gtts import gTTS
 
-HOST, PORT = "10.100.1.150", 6379
+HOST, PORT = "127.0.0.1", 6379
 client_id = "m59KXbFvFqBB5aaTvZea"
 client_secret = "M66UpJ4Gr5"
 

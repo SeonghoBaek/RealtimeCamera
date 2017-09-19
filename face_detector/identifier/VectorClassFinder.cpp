@@ -316,7 +316,7 @@ int VectorClassFinder::nodtify(float data1, Vector& vector)
 void VectorClassFinder::run()
 {
 
-    const char *hostname = "10.100.1.150";
+    const char *hostname = "127.0.0.1";
     int port = 6379;
     struct timeval timeout = {1, 500000};
 

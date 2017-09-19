@@ -20,6 +20,8 @@ import numpy as np
 import signal
 import sys
 import random
+from nolearn.dbn import DBN
+from sklearn.metrics import log_loss
 
 
 class Logger(object):
@@ -47,6 +49,8 @@ def info_print(str):
     if info is True:
         print(str)
 
+def dbn_loss_func(targets, outputs):
+    pass
 
 def getRep(imgPath, multiple=False):
 
@@ -729,9 +733,9 @@ if __name__ == "__main__":
     g_oguest_std_list = {}
     g_oguest_embedding_list = {}
 
-    HOST, PORT = "10.100.1.152", 55555
+    HOST, PORT = "127.0.0.1", 55555
     # HOST, PORT = "10.100.0.53", 55555
-    REDIS_SERVER = '10.100.1.150'
+    REDIS_SERVER = '127.0.0.1'
     REDIS_PORT = 6379
     parser = argparse.ArgumentParser()
 

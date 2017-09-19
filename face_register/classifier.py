@@ -141,15 +141,17 @@ def dbn_loss_func(targets, outputs):
 
     err_sum = 0.0
 
-    for i in range(len(outputs)):
+    #for i in range(len(outputs)):
         #print outputs[i]
         #err_sum += np.sum(np.square(outputs[i] - targets[i]))
-        err_sum += log_loss(targets[i], outputs[i])
+        #err_sum += log_loss(targets[i], outputs[i], normalize=False)
         #outputs[i] = np.exp(outputs[i]) / np.sum(np.exp(outputs[i]), axis=0)
         #print outputs[i]
      #   print err_sum
-    err_sum = err_sum / len(outputs)
-    #err_sum = log_loss(targets, outputs)
+
+
+    #err_sum = err_sum / len(outputs)
+    err_sum = log_loss(targets, outputs)
 
     return err_sum
 
@@ -209,20 +211,22 @@ def train(args):
         num_epoch = args.epoch
 
         # -1, 256, 256, 192, 128, -1
-        clf = DBN([-1, 96, 64, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
+        clf = DBN([-1, 128, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
                   learn_rates_pretrain=0.005,
                   # Smaller steps mean a possibly more accurate result, but the
                   # training will take longer
-                  #learn_rate_decays=0.9,
+                  learn_rate_decays=0.9,
                   # a factor the initial learning rate will be multiplied by
                   # after each iteration of the training
+                  use_re_lu=True,
                   minibatch_size=32,
-                  epochs=num_epoch,  # no of iternation
+                  epochs=num_epoch,  # no of iteration
                   dropouts=0.5, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
-                  #loss_funct=dbn_loss_func,
+                  loss_funct=dbn_loss_func,
                   verbose=1)
+
 
     #if args.ldaDim > 0:
     #    clf_final = clf
