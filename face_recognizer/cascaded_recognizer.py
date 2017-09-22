@@ -265,14 +265,14 @@ def infer(fileName, mode):
     if person != person_dbn:
         return 'Unknown', 0
 
-    if confidence < 0.85:  # Hard limit
-        return person, confidence
+    #if confidence < 0.85:  # Hard limit
+    #    return person, confidence
+    
+    leaky = 0.9
 
     #c = np.array([confidence_dbn, confidence])
 
     #avgt = np.mean([confidence_dbn, confidence])
-
-    leaky = 0.7
 
     avgt = leaky * confidence_dbn + (1 - leaky) * confidence
     confidence = avgt

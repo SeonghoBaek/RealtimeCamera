@@ -133,25 +133,27 @@ def dbn_loss_func(targets, outputs):
     if hasattr(outputs, 'as_numpy_array'):
         outputs = outputs.as_numpy_array()
 
-    #print outputs, targets
+    # Label Smoothing
 
-    #for v in outputs:
-    #    v = np.exp(v) / np.sum(np.exp(v), axis=0)
-    #    print v
+    T = np.zeros(outputs.shape, dtype=np.float64)
 
-    err_sum = 0.0
+    for i in range(len(targets)):
+        for j in range(len(targets[i])):
+            if targets[i][j] == 0:
+                T[i][j] = 0.08
+            else:
+                T[i][j] = (1 - (0.08 * (len(targets) - 1)))
 
-    #for i in range(len(outputs)):
-        #print outputs[i]
-        #err_sum += np.sum(np.square(outputs[i] - targets[i]))
-        #err_sum += log_loss(targets[i], outputs[i], normalize=False)
-        #outputs[i] = np.exp(outputs[i]) / np.sum(np.exp(outputs[i]), axis=0)
-        #print outputs[i]
-     #   print err_sum
+    loss = 0.0
 
+    # Cross Entropy
+    for i in range(len(outputs)):
+        loss += (-T[i] * np.log(outputs[i])).sum()
+        #print loss
 
-    #err_sum = err_sum / len(outputs)
-    err_sum = log_loss(targets, outputs)
+    err_sum = loss
+    #err_sum = np.average(loss)
+    #err_sum = log_loss(targets, outputs)
 
     return err_sum
 
@@ -211,7 +213,7 @@ def train(args):
         num_epoch = args.epoch
 
         # -1, 256, 256, 192, 128, -1
-        clf = DBN([-1, 128, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
+        clf = DBN([-1, 256, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
                   learn_rates=0.1,
                   learn_rates_pretrain=0.005,
                   # Smaller steps mean a possibly more accurate result, but the
@@ -226,13 +228,6 @@ def train(args):
                   # will be randomly dropped as a decimal.
                   loss_funct=dbn_loss_func,
                   verbose=1)
-
-
-    #if args.ldaDim > 0:
-    #    clf_final = clf
-    #    dim = nClasses - 1
-    #    clf = Pipeline([('lda', LDA(n_components=args.ldaDim)),
-    #                    ('clf', clf_final)])
 
     if args.classifier == 'DBN':
         clf_final = clf
@@ -295,7 +290,7 @@ if __name__ == '__main__':
     parser.add_argument('--imgDim', type=int,
                         help="Default image dimension.", default=96)
     parser.add_argument('--cuda', action='store_true')
-    parser.add_argument('--verbose', action='store_true')
+    parser.add_argument('--verbose', action='store_false')
 
     subparsers = parser.add_subparsers(dest='mode', help="Mode")
     trainParser = subparsers.add_parser('train',
