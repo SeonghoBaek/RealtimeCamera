@@ -1,16 +1,21 @@
 #!/bin/bash
-. /home/airi/distro/install/bin/torch-activate
 
-if [ -f "./on_training" ]; then
-    echo "On Training. Exit."
-    exit 1
-fi
+#if [ -f "./on_training" ]; then
+#    echo "On Training. Exit."
+#    exit 1
+#fi
 
-touch on_training
+#touch on_training
+
+find . -name *.jpg_f.jpg -exec rm -f {} \;
+find . -name *.jpg_w.jpg -exec rm -f {} \;
+
+echo Run Sample Augmentation
+python augmentation.py
 
 echo Align face image..Wait
 rm -rf output
-rm -f input/cache.*
+#rm -f input/cache.*
 #rm -f output/aligned/cache* > /dev/null
 #rm -f output/embedding/cache* > /dev/null
 
@@ -23,8 +28,8 @@ python guest_sampling.py
 #../openface/util/align-dlib.py input/oguest/ align innerEyesAndBottomLip output/aligned/oguest --size 96
 
 echo Embedding aligned face image..Wait
-../openface/batch-represent/main.lua -outDir output/embedding/user -data output/aligned/user
-../openface/batch-represent/main.lua -outDir output/embedding/iguest -data output/aligned/iguest
+../openface/batch-represent/main.lua -cuda -outDir output/embedding/user -data output/aligned/user
+../openface/batch-represent/main.lua -cuda -outDir output/embedding/iguest -data output/aligned/iguest
 #../openface/batch-represent/main.lua -outDir output/embedding/oguest -data output/aligned/oguest
 
 echo Training SVM..Wait
@@ -47,4 +52,4 @@ mv -f output/embedding/iguest/classifier.pkl ../dbn/classifier_iguest.pkl
 #./classifier.py --dlibFacePredictor ignore --cuda train --classifier DBN  output/embedding/oguest
 #mv -f output/embedding/oguest/classifier.pkl ../dbn/classifier_oguest.pkl
 
-rm -f on_training
+#rm -f on_training
