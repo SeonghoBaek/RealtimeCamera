@@ -151,8 +151,8 @@ def dbn_loss_func(targets, outputs):
         loss += (-T[i] * np.log(outputs[i])).sum()
         #print loss
 
-    err_sum = loss
-    #err_sum = np.average(loss)
+    #err_sum = loss
+    err_sum = loss/len(outputs)
     #err_sum = log_loss(targets, outputs)
 
     return err_sum
@@ -214,7 +214,7 @@ def train(args):
 
         # -1, 256, 256, 192, 128, -1
         clf = DBN([-1, 256, 256, 192, 128, -1],  # i/p nodes, hidden nodes, o/p nodes
-                  learn_rates=0.1,
+                  learn_rates=0.05,
                   learn_rates_pretrain=0.005,
                   # Smaller steps mean a possibly more accurate result, but the
                   # training will take longer
@@ -224,7 +224,7 @@ def train(args):
                   use_re_lu=True,
                   minibatch_size=32,
                   epochs=num_epoch,  # no of iteration
-                  dropouts=0.5, # Express the percentage of nodes that
+                  dropouts=0.3, # Express the percentage of nodes that
                   # will be randomly dropped as a decimal.
                   loss_funct=dbn_loss_func,
                   verbose=1)
