@@ -268,7 +268,7 @@ def infer(fileName, mode):
     #if confidence < 0.85:  # Hard limit
     #    return person, confidence
     
-    leaky = 0.9
+    leaky = 0.7
 
     #c = np.array([confidence_dbn, confidence])
 
@@ -598,6 +598,7 @@ def main():
                         candidate = person
                         candidate_confidence = confidence
 
+                        '''
                         if candidate_confidence < threshold:
                             person, confidence = infer(fileName, 'iguest')
                             info_print("\n   IGuest Group:" + person + '(' + str(int(100 * confidence)) + '%)')
@@ -621,7 +622,7 @@ def main():
                                         # else:
                                         #    if confidence > candidate_confidence:
                                         #        candidate_confidence = confidence
-
+                       
                         else:
                             person, confidence = infer(fileName, 'iguest')
 
@@ -634,6 +635,7 @@ def main():
                                     if confidence >= threshold:
                                         candidate = person
                                         candidate_confidence = confidence
+                        '''
 
                         '''
                         if confidence < threshold:
@@ -661,6 +663,9 @@ def main():
                             # info_print("{} : {} %, size : {}".format(person, int(100 * confidence), str(bbox_size)))
                             info_print("\nPredict {} : {} %".format(candidate, int(100 * candidate_confidence)))
 
+                        if candidate == 'Guest':
+                            candidate = 'Unknown'
+
                         if candidate_confidence > 0:
                             if sock_ready is True:
                                 if candidate != 'Unknown' and candidate != 'Nobody':
@@ -685,7 +690,7 @@ if __name__ == "__main__":
 
     sys.stdout = Logger()
 
-    threshold = 0.9
+    threshold = 0.95
     fn_threshold = 0.8
     alpha = 1.64  # 95%: 1.96, 90 %: 1.64
     show_time = False
