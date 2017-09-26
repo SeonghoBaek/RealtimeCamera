@@ -146,9 +146,12 @@ def dbn_loss_func(targets, outputs):
 
     loss = 0.0
 
+    ones = np.ones(outputs.shape[1], dtype=np.float64)
+    eps = 1e-10
+
     # Cross Entropy
     for i in range(len(outputs)):
-        loss += (-T[i] * np.log(outputs[i])).sum()
+        loss += (-1 * (T[i] * np.log(outputs[i] + eps) + (ones-T[i])*np.log(ones-outputs[i] + eps))).sum()
         #print loss
 
     #err_sum = loss
