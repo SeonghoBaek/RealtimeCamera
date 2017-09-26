@@ -137,12 +137,16 @@ def dbn_loss_func(targets, outputs):
 
     T = np.zeros(outputs.shape, dtype=np.float64)
 
+    threashold = 0.8
+
     for i in range(len(targets)):
         for j in range(len(targets[i])):
             if targets[i][j] == 0:
-                T[i][j] = 0.08
+                #T[i][j] = 0.08
+                T[i][j] = (1 - threashold) / (len(targets) - 1)
             else:
-                T[i][j] = (1 - (0.08 * (len(targets) - 1)))
+                #T[i][j] = (1 - (0.08 * (len(targets) - 1)))
+                T[i][j] = threashold
 
     loss = 0.0
 
@@ -151,7 +155,9 @@ def dbn_loss_func(targets, outputs):
 
     # Cross Entropy
     for i in range(len(outputs)):
-        loss += (-1 * (T[i] * np.log(outputs[i] + eps) + (ones-T[i])*np.log(ones-outputs[i] + eps))).sum()
+        #loss += (-1 * (T[i] * np.log(outputs[i] + eps) + (ones-T[i])*np.log(ones-outputs[i] + eps))).sum()
+        loss += (-1 * (T[i] * np.log(outputs[i] + eps))).sum()
+        #loss += (-1 * np.log(outputs[i] + eps)).sum()
         #print loss
 
     #err_sum = loss
