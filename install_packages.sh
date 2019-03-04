@@ -6,8 +6,8 @@ sudo apt-get install -y python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev l
 sudo apt-get install -y graphicsmagick python-dev python-pip python-numpy python-nose python-scipy python-pandas python-protobuf
 sudo apt-get install -y libevent-dev
 
-git clone https://github.com/opencv/opencv.git
-git clone https://github.com/opencv/opencv_contrib.git
+git clone  -b 3.4.0 https://github.com/opencv/opencv
+git clone -b 3.4.0 https://github.com/opencv/opencv_contrib
 
 pushd .
 
