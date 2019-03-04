@@ -25,7 +25,7 @@ contact: *seonghobaek@gmail.com*
 ## *CUDA/CUDNN*
 
     - NVidia Wed Site.
-    - CUDA 8.0 / CUDNN 5.1 
+    - CUDA 8.0 / CUDNN 5.1(tested), CUDNN 6.0(tested) 
 
 
 ## *Installation*
