@@ -47,7 +47,7 @@ sudo make install
 
 popd
 
-sudo python setup.py install --yes USE_AVX_INSTRUCTIONS
+sudo python setup.py install --yes USE_AVX_INSTRUCTIONS --yes DLIB_USE_CUDA
 
 popd
 
