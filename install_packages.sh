@@ -6,16 +6,17 @@ sudo apt-get install -y python-dev python-numpy libtbb2 libtbb-dev libjpeg-dev l
 sudo apt-get install -y graphicsmagick python-dev python-pip python-numpy python-nose python-scipy python-pandas python-protobuf
 sudo apt-get install -y libevent-dev
 
-git clone  -b 3.4.0 https://github.com/opencv/opencv
-git clone -b 3.4.0 https://github.com/opencv/opencv_contrib
+git clone  -b 3.4.0 https://github.com/opencv/opencv opencv
+git clone -b 3.4.0 https://github.com/opencv/opencv_contrib opencv_contrib
 
 pushd .
 
-cd opencv-3.4.0
+# Check opencv clone directory
+cd opencv
 mkdir build
 cd build
 
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-3.4.0/modules/ -DPYTHON2_NUMPY_INCLUDE_DIRS=/usr/local/lib/python2.7/dist-packages/numpy/core/include/ ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local -DOPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules/ -DPYTHON2_NUMPY_INCLUDE_DIRS=/usr/local/lib/python2.7/dist-packages/numpy/core/include/ ..
 
 make -j8
 sudo make install
