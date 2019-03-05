@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 ulimit -c unlimited
-export LD_LIBRARY_PATH="./lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="./lib:/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
 bin/darknet yolo camera cfg/yolo-face.cfg models/face.weights 127.0.0.1 127.0.0.1 
 
 pushd .
