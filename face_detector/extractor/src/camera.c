@@ -21,14 +21,18 @@
 #include <hiredis.h>
 #include <unistd.h>
 #include <opencv2/videoio/videoio_c.h>
+#include <opencv2/highgui/highgui_c.h>
 
 #endif
 
 #include "identifier.h"
 
+/*
+ * Update wait time. Added by Seongho Baek 2019.03.20
+ */
 #define MIN_WAIT_TIME 2
-#define MAX_WAIT_TIME 200
-#define STEP_WAIT_TIME 30
+#define MAX_WAIT_TIME 50
+#define STEP_WAIT_TIME 10
 
 image get_image_from_stream(CvCapture *cap);
 
@@ -217,6 +221,12 @@ void *detect_in_thread(void *ptr)
     det = images[(camera_index + FRAMES/2 + 1)%FRAMES];
     camera_index = (camera_index + 1)%FRAMES;
 
+    /*
+     * Added by Seongho Baek 2019.03.20
+     * By version up the captured frame, old bbox would be invalidated.
+     */
+    version_up();
+
     //printf("num bbox: %d\n", num_bbox);
     if (find_object == 0)
     {
@@ -225,6 +235,8 @@ void *detect_in_thread(void *ptr)
             gFirstDetectDelayTime += STEP_WAIT_TIME;
         }
         else gFirstDetectDelayTime = MAX_WAIT_TIME;
+
+        //invalidate(); // Invalidate all labels in memory. Added by Seongho Baek 2019.03.20
 
         return 0;
     }
@@ -255,6 +267,41 @@ double get_wall_time()
         return 0;
     }
     return (double)time.tv_sec + (double)time.tv_usec * .000001;
+}
+
+
+image shot_to_save;
+char* shot_filename_to_save = 0;
+int   shot_seq = 0;
+
+/* Thread for saving captured image. Added by Seongho Baek 2019.03.18 */
+void *save_shot_in_thread(void *ptr)
+{
+    if (shot_filename_to_save)
+    {
+        char buff[80];
+
+        shot_seq++;
+        shot_seq %=2;
+
+        //save_image(shot_to_save, shot_filename_to_save);
+        memset(buff, 0, sizeof(buff));
+        sprintf(buff, "../robot/node/public/screenshot%d\0", shot_seq);
+
+        save_image(shot_to_save, buff);
+
+        if (shot_seq == 0)
+        {
+            /* Mitigate flickering . Added by Seongho Baek 2019.03.18 */
+            memset(buff, 0, sizeof(buff));
+            sprintf(buff, "../robot/node/public/screenshot%d.jpg\0", shot_seq);
+            rename("../robot/node/public/screenshot0.jpg", "../robot/node/public/screenshot.jpg");
+        }
+
+        shot_filename_to_save = 0;
+    }
+
+    return 0;
 }
 
 void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *local_server, const char* redis_server, char **names, int classes)
@@ -423,15 +470,23 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 #endif
 
     while (1) {
+        pthread_t image_save_thread_t = -1;
+
         gFrameNum++;
         gFrameNum %= 100;
 
         if (pthread_create(&fetch_thread, 0, fetch_in_thread, 0)) error("Thread creation failed");
         if (pthread_create(&detect_thread, 0, detect_in_thread, 0)) error("Thread creation failed");
 
-        if (gFrameNum % 5 == 0)
+        if (gFrameNum % 2 == 0)
         {
-            save_image(disp, "../robot/node/public/screenshot");
+            //save_image(disp, "../robot/node/public/screenshot");
+
+            shot_filename_to_save = "../robot/node/public/screenshot";
+            shot_to_save = disp;
+
+			/* Thread for saving captured image. Added by Seongho Baek 2019.03.18 */
+            pthread_create(&image_save_thread_t, 0, save_shot_in_thread, 0);
         }
 
 #ifdef SHOW_WINDOW
@@ -442,6 +497,9 @@ void run_camera(char *cfgfile, char *weightfile, float thresh, int cam_index, co
 
         pthread_join(fetch_thread, 0);
         pthread_join(detect_thread, 0);
+
+        if (image_save_thread_t != -1)
+            pthread_join(image_save_thread_t, 0);
 
 #ifdef SHOW_WINDOW
         if (c == 10)
@@ -586,8 +644,6 @@ void detect_camera(char *cfgfile, char *weightfile, float thresh, int cam_index,
     }
 
     double before = get_wall_time();
-
-
 
     while(1)
     {
