@@ -12,6 +12,7 @@
 #include "RedisIO.h"
 #include "Lock.h"
 #include <dirent.h>
+#include <limits.h>
 
 #define CURRENT_NUM_LABEL 11
 #define MAX_LABEL_LENGTH 80
@@ -19,7 +20,7 @@
 #define LABEL_DIRECTORY_IGUEST "../face_register/input/iguest"
 #define LABEL_DIRECTORY_OGUEST "../face_register/input/oguest"
 
-#define LABEL_INVALIDATE_STATE -1
+#define LABEL_INVALIDATE_STATE -2
 #define LABEL_READY_STATE -1
 #define LABEL_VALID_STATE 1
 
@@ -145,6 +146,7 @@ private:
     unsigned int    mVersion;
     double          mLastBridgeSendTime;
     Timer           *mpTimer;
+    int             mIgnoreInvalidation; /* Added by Seongho Baek 2019.03.20 */
 
     float       getDistance(int sx, int sy, int tx, int ty);
     float       getIoU(int sleft, int sright, int stop, int sbottom, int left, int right, int top, int bottom);
@@ -169,6 +171,9 @@ public:
         mpLabels = NULL;
         mVersion = 0;
         mLastBridgeSendTime = 0;
+        mIgnoreInvalidation = 0; /* Added by Seongho Baek 2019.03.20 */
+
+        /* Need revision. Do not use bbox invalidation by timer reset. Added by Seongho Baek 2019.03.20 */
         mpTimer = new Timer();
 
         this->mpTimer->setTimer(this, 3000);
@@ -232,7 +237,9 @@ public:
 
                 if (S_ISDIR(statbuf.st_mode) && pDirent->d_name[0] != '.')
                 {
-                    if (strcmp(pDirent->d_name, unknown)) {
+                    if (strcmp(pDirent->d_name, unknown) &&
+                            strcmp(pDirent->d_name, "groups") &&
+                            strcmp(pDirent->d_name, "User")) {
                         numLabels++;
                     }
                 }
@@ -243,6 +250,9 @@ public:
             this->mNumLabel = numLabels;
         }
 
+        LOGD("Num of user label: %d", this->mNumLabel);
+
+        /* HyDRUWA: No need iguest, oguest group. Added by Seongho Baek 2019.03.19
         pDp = opendir(LABEL_DIRECTORY_IGUEST);
 
         if (pDp)
@@ -296,6 +306,7 @@ public:
 
             this->mNumLabel += numLabels;
         }
+        */
 
         this->mpLabels = new Label[this->mNumLabel];
 
@@ -317,7 +328,9 @@ public:
                 if (S_ISDIR(statbuf.st_mode) && namelist[i]->d_name[0] != '.')
                 {
                     //printf("%s\n", namelist[i]->d_name);
-                    if (strcmp(namelist[i]->d_name, unknown))
+                    if (strcmp(namelist[i]->d_name, unknown) &&
+                            strcmp(namelist[i]->d_name, "groups") &&
+                            strcmp(namelist[i]->d_name, "User"))
                     {
                         this->mpLabels[label_index].setLabel(namelist[i]->d_name);
                         label_index++;
@@ -330,6 +343,7 @@ public:
             free(namelist);
         }
 
+        /* HyDRUWA: No need iguest, oguest group. Added by Seongho Baek 2019.03.19
         n = scandir(LABEL_DIRECTORY_IGUEST, &namelist, 0, alphasort);
 
         if (n < 0)
@@ -383,6 +397,7 @@ public:
 
             free(namelist);
         }
+        */
 
         for (int i = 0; i < this->mNumLabel; i++)
         {
@@ -411,10 +426,13 @@ public:
         LOCK(mFrameLock)
         {
             this->mVersion++;
+            this->mVersion %= UINT_MAX; // Added by Seongho Baek 2019.03.20
         }
     }
 
     void run();
+
+    int invalidate();
 
     int timerCallback(const char *event) override;
 };
