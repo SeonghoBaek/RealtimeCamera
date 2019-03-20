@@ -18,14 +18,15 @@
         <input type="submit" value="Open"/>
     </div>
 </form>
-<center><IMG id="photo" SRC="screenshot.jpg" WIDTH=480 HEIGHT=480></IMG></center>
+<center><IMG id="photo" SRC="screenshot.jpg" WIDTH=640 HEIGHT=640></IMG></center>
 <script type="text/javascript" src="wilson_files/formoid1/formoid-flat-green.js"></script>
 <script type="text/javascript">
 	//setTimeout("location.reload()", 1000)
 	setInterval(function(){
 		var img = document.querySelector('#photo');
 		img.src = 'screenshot.jpg?ts=' + Date.now();
-	}, 500)
+	}, 10 * Math.random() + 30)
+
 </script>
 <!-- Stop Formoid form-->
 
