@@ -154,7 +154,7 @@ private:
     int         sendToBridge(const char *name, void* buff, int size);
 
 public:
-    IMPLEMENT_THREAD(run());
+    IMPLEMENT_THREAD(this->run());
 
     VectorClassFinder()
     {
