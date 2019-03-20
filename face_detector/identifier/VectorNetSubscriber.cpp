@@ -25,13 +25,13 @@ void VectorNetSubscriber::run()
 
     while (1)
     {
-        LOGI("Wait Client Connection");
+        LOGI("Wait Client Connection: %s: %d", this->mIpStr, this->mPort);
         clientSock = this->acceptOnSocket(this->mSd, NULL); // We accept only one client.
 
         if (clientSock != -1)
         {
             int length = -1;
-            LOGI("Client Accepted");
+            LOGI("Client Accepted: %d", this->mPort);
             this->mClientSd = clientSock;
 
             Vector dummy;
