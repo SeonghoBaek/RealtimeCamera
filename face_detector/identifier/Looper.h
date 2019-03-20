@@ -77,7 +77,7 @@ private:
     Looper  *mpLooper;
 
 public:
-    IMPLEMENT_THREAD(run())
+    IMPLEMENT_THREAD(this->run())
 
     TimerThread(int mili, ITimer *pCallback)
     {
