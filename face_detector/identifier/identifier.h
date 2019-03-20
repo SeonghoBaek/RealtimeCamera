@@ -8,11 +8,12 @@
 extern "C" {
 #endif
 
-int run_identifier(const char* local_server);
-void clear_label_check_info();
-char* get_label_in_box(int x, int y, int h, int w);
-void version_up();
-int door_open();
+int     run_identifier(const char* local_server);
+void    clear_label_check_info();
+char*   get_label_in_box(int x, int y, int h, int w);
+void    version_up();
+int     door_open();
+void    invalidate();
 #ifdef USE_SRC
 void train_sparse();
 int test_image_file(const char *image_file_path, const char *label);
