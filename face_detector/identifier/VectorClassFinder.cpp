@@ -22,6 +22,8 @@ using namespace std;
 #define USE_TRACKING 1
 #define LABEL_VERSION_DIFF 15
 
+float CONFIDENCE_LEVEL = 0.96;
+
 #if (IOU_SINGLE_MODE == 1)
 float IOU_INTERSECT_NEW_USER = 0.7;
 float IOU_INTERSECT_CUR_USER = 0.4;
@@ -34,6 +36,8 @@ float IOU_INTERSECT_TRACKING = 0.5;
 
 #if (USE_ROBOT == 1)
 int gSupportRobot = 1;
+#else
+int gSupportRobot = 0;
 #endif
 
 redisContext    *gTTSRedisContext = NULL;
@@ -131,19 +135,23 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     {
         LabelListItem *pItem = this->mpActiveLabelList;
 
+        this->mIgnoreInvalidation = 1; /* Added by Seongho Baek 2019.03.20 */
+
         while (pItem != NULL)
         {
-            if (pItem->mpLabel->mChecked == 0)
+            //if (pItem->mpLabel->mChecked == 0)
             {
                 //LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
                 int invalidate = 0;
                 int tooOld = 0;
 
+                /*
                 if (this->mpLabels[pItem->mpLabel->mLabelIndex].getX() == LABEL_INVALIDATE_STATE)
                 {
                     invalidate = 1;
                     LOGD("Invalidate: %s", this->mpLabels[pItem->mpLabel->mLabelIndex].getLabel());
                 }
+                */
 
                 /*
                 if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
@@ -151,7 +159,6 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
                     tooOld = 1;
                 }
-                */
 
                 if (invalidate == 1 || tooOld == 1)
                 {
@@ -193,6 +200,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     }
                 }
                 else
+                */
                 {
                     int labelIndex = pItem->mpLabel->mLabelIndex;
 
@@ -240,14 +248,14 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
                 if (iou >= IoU)
                 {
-#if (USE_UPDATE_CHECK == 1)
+                    #if (USE_UPDATE_CHECK == 1)
                     if (cur - this->mpLabels[i].mUpdateTime > 4.0)
                     {
                         LOGD("diff: %f for %s", (float)(cur - this->mpLabels[i].mUpdateTime), this->mpLabels[i].getLabel());
                         this->mpLabels[i].setX(-1);
                         continue;
                     }
-#endif
+                    #endif
                     index = i;
                     IoU = iou;
                     break;
@@ -316,7 +324,7 @@ int VectorClassFinder::nodtify(float data1, Vector& vector)
 void VectorClassFinder::run()
 {
 
-    const char *hostname = "127.0.0.1";
+    const char *hostname = "10.144.164.202";
     int port = 6379;
     struct timeval timeout = {1, 500000};
 
@@ -492,26 +500,32 @@ int VectorClassFinder::fireUserEvent(int labelIndex)
             return 0;
         }
 
+		/*
         if (gTTSRedisContext && labelIndex > -1)
         {
             char *name = this->mpLabels[labelIndex].getLabel();
             redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
         }
+		*/
 
+		/*
         if (this->sendToBridge("/var/tmp/robot_bridge", (void *)"open", 4) < 0)
         {
             // Successful open.
             //this->mVersion = 0; // Reset.
             LOGI("Robot send error\n");
         }
+		*/
     }
     else
     {
+		/*
         if (gTTSRedisContext && labelIndex > -1)
         {
             char *name = this->mpLabels[labelIndex].getLabel();
             redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", name);
         }
+		*/
     }
 
     return 0;
@@ -597,7 +611,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 
     LOCK(this->mFrameLock)
     {
-        if (pV->mConfidence < 0.9)
+        if (pV->mConfidence < CONFIDENCE_LEVEL)
         {
             LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
 
@@ -666,6 +680,7 @@ int VectorClassFinder::looperCallback(const char *event) {
                 delete pV;
                 return 0;
             }
+            /* Why need? Added by Seongho Baek 2019.03.20
             else
             {
                 int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
@@ -682,6 +697,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 
                 LOGD("Label State %d, %s, %d\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel(), abs(this->mVersion - prevVersion));
             }
+            */
 
             LOGD("Find New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
 
@@ -699,7 +715,7 @@ int VectorClassFinder::looperCallback(const char *event) {
 
             if (labelState == LABEL_VALID_STATE)
             {
-                if (pV->mConfidence < 0.9)
+                if (pV->mConfidence < 0.6)
                 {
                     this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
                     this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
@@ -1011,11 +1027,87 @@ int VectorClassFinder::looperCallback(const char *event) {
     return 0;
 }
 
-int VectorClassFinder::timerCallback(const char *event)
+int VectorClassFinder::invalidate()
 {
     LOCK(this->mFrameLock)
     {
-        LOGD("Reset Timer Callback!\n");
+        LabelListItem *pItem = this->mpActiveLabelList;
+
+        if (this->mIgnoreInvalidation) return -1; /* Added by Seongho Baek 2019.03.20 */
+
+        //LOGD("Invalidate old label information.");
+
+        while (pItem != NULL)
+        {
+            if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
+            {
+                this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+                this->mpLabels[pItem->mpLabel->mLabelIndex].mConfidence = 0.85;
+
+                LabelListItem *pDelItem = pItem;
+
+                if (pItem == this->mpActiveLabelList) // Head
+                {
+                    LOGD("Delete Head");
+                    this->mpActiveLabelList = pItem->mpNext;
+
+                    if (this->mpActiveLabelList != NULL)
+                    {
+                        this->mpActiveLabelList->mpPrev = this->mpActiveLabelList;
+                    }
+
+                    delete pDelItem;
+
+                    pItem = this->mpActiveLabelList;
+
+                    continue;
+                }
+                else
+                {
+                    pItem->mpPrev->mpNext = pItem->mpNext;
+
+                    if (pItem->mpNext != NULL)
+                    {
+                        pItem->mpNext->mpPrev = pItem->mpPrev;
+                    }
+
+                    pItem = pItem->mpNext;
+
+                    delete pDelItem;
+
+                    continue;
+                }
+            }
+
+            if (pItem != NULL) pItem = pItem->mpNext;
+        }
+    }
+
+    return 0;
+}
+
+int VectorClassFinder::timerCallback(const char *event)
+{
+    /*
+     * Added by Seongho Baek 2019.03.20
+     *
+     * Periodic label invalidation using frame version.
+     * Invalidate old label.
+     */
+    if (this->invalidate() == -1)
+    {
+        LOCK(this->mFrameLock)
+        {
+            this->mIgnoreInvalidation = 0;
+        }
+    }
+
+    return 0;
+
+    /* Comment out by Seongho Baek 2019.03.20
+    LOCK(this->mFrameLock)
+    {
+        //LOGD("Reset Timer Callback!\n");
         //this->mVersion = 0; // Reset.
         LabelListItem *pItem = this->mpActiveLabelList;
 
@@ -1028,4 +1120,5 @@ int VectorClassFinder::timerCallback(const char *event)
     }
 
     return 0;
+    */
 }
