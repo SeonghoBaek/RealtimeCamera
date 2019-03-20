@@ -38,7 +38,7 @@ private:
     int sendToSocket(int sd, const void* buffer, size_t bufferSize);
 
 public:
-    IMPLEMENT_THREAD(run());
+    IMPLEMENT_THREAD(this->run());
 
     VectorNetSubscriber(const char* ipString, int port)
     {
