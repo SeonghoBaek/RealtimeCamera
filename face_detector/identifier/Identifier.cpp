@@ -28,8 +28,10 @@ int run_identifier(const char* local_server) {
 
     // TCP Socket
     VectorNetSubscriber *vs = new VectorNetSubscriber(local_server, 55555, pGVCF);
+    VectorNetSubscriber *vs2 = new VectorNetSubscriber(local_server, 55556, pGVCF);
 
     vs->startThread();
+    vs2->startThread();
 
     sleep(1);
 
@@ -53,6 +55,11 @@ char *get_label_in_box(int left, int top, int right, int bottom)
 void version_up()
 {
     pGVCF->versionUp();
+}
+
+void invalidate()
+{
+    pGVCF->invalidate();
 }
 
 int door_open() {
