@@ -197,7 +197,9 @@ char*   strlabel = NULL;
 int     gUploadStep = 0;
 int     gFrameSeq = 0;
 float   gBoxRGB[] = {0.95, 0.95, 0.95};
-
+int     redis_channel_index = 0;
+char    *p_redis_channel[] = {"camera1", "camera2"};
+char    *p_redis_frame[] = {"frame1", "frame2"};
 #define UPLOAD_STEP 4
 
 int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
@@ -212,9 +214,10 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
 
     redisReply *pReply = NULL;
 
+    /* Move frame version up function to camera detection thread. Added by Seongho Baek 2019.03.20
     version_up();
-
-    if (num == 0) return;
+    */
+    if (num == 0) return -1; // Fix no return. Added by Seongho Baek 2019.03.20
 
     image original_image = copy_image(im);
 
@@ -229,7 +232,7 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
         gFrameSeq %= 30;
         sprintf(number, "%d", gFrameSeq);
 
-        redisCommand(pRC, "SET %s %s", "frame", number);
+        redisCommand(pRC, "SET %s %s", p_redis_frame[redis_channel_index], number);
     }
 
     for(i = 0; i < num; ++i)
@@ -272,9 +275,15 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
 
             //printf("w: %d, h: %d\n", right - left, bot - top);
 
-            if (right-left > 140 || right-left < 60)
+            if (right-left > 140)
             {
-                printf("Too large face. Ignore\n");
+                printf("Too large face, width: %d, Ignore\n", right-left);
+                continue;
+            }
+
+            if (right-left < 40)
+            {
+                printf("Too small face, width: %d, Ignore\n", right-left);
                 continue;
             }
 
@@ -283,6 +292,7 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
                 unsigned char   *payload = NULL;
                 FILE            *p_img_file = NULL;
                 int             length = 0;
+                pthread_t       image_save_thread_t = -1;
 
                 // Save face box image. Added by Seongho Baek 2016.12.20
                 memset(filename, 0, 80);
@@ -339,7 +349,9 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
                 if (pRC)
                 {
                     //printf("publish payload\n");
-                    redisCommand(pRC, "PUBLISH %s %b", "camera", payload, length + 17);
+                    redisCommand(pRC, "PUBLISH %s %b", p_redis_channel[redis_channel_index], payload, length + 17);
+                    redis_channel_index++;
+                    redis_channel_index %= 2;
                 }
 
                 free(payload);
@@ -383,7 +395,7 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
             }
         }
 
-        //sleep(0);
+        sleep(0);
     }
 
     free_image(original_image);
