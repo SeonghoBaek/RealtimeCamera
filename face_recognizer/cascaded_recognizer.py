@@ -11,7 +11,7 @@ import shutil
 import socket
 import struct
 import dlib
-from sklearn.mixture import GMM
+#from sklearn.mixture import GMM
 from scipy.spatial import distance
 import os
 import pandas as pd
@@ -20,7 +20,7 @@ import numpy as np
 import signal
 import sys
 import random
-from nolearn.dbn import DBN
+#from nolearn.dbn import DBN
 from sklearn.metrics import log_loss
 
 
@@ -203,9 +203,9 @@ def infer(fileName, mode):
         start = time.time()
 
     confidence = 0
-    confidence_dbn = 0
-    person = ''
-    person_dbn = ''
+    #confidence_dbn = 0
+    person = ['']
+    #person_dbn = ''
     std_list = {}
     mean_list = {}
     emb_list = {}
@@ -213,34 +213,38 @@ def infer(fileName, mode):
     if mode == 'user':
         #info_print('User Group')
         predictions = clf.predict_proba(rep).ravel()
-        pred_dbn = clf_dbn.predict_proba(rep).ravel()
+        #pred_dbn = clf_dbn.predict_proba(rep).ravel()
 
         maxI = np.argmax(predictions)
-        person = le.inverse_transform(maxI)
+
+        #print('maxI: ', maxI, ', predictions: ', predictions)
+        #print('Num Classes: ', le.classes_)
+        person = le.inverse_transform([maxI])
         confidence = predictions[maxI]
 
-        maxI = np.argmax(pred_dbn)
-        person_dbn = le_dbn.inverse_transform(maxI)
-        confidence_dbn = pred_dbn[maxI]
+        #maxI = np.argmax(pred_dbn)
+        #person_dbn = le_dbn.inverse_transform(maxI)
+        #confidence_dbn = pred_dbn[maxI]
         mean_list = g_dist_mean_list
         std_list = g_std_list
         emb_list = g_embedding_list
-
+    '''
     else:
         #info_print('IGuest Group')
         predictions = clf_iguest.predict_proba(rep).ravel()
-        pred_dbn = clf_dbn_iguest.predict_proba(rep).ravel()
+        #pred_dbn = clf_dbn_iguest.predict_proba(rep).ravel()
 
         maxI = np.argmax(predictions)
         person = le_iguest.inverse_transform(maxI)
         confidence = predictions[maxI]
 
-        maxI = np.argmax(pred_dbn)
-        person_dbn = le_dbn_iguest.inverse_transform(maxI)
-        confidence_dbn = pred_dbn[maxI]
+        #maxI = np.argmax(pred_dbn)
+        #person_dbn = le_dbn_iguest.inverse_transform(maxI)
+        #confidence_dbn = pred_dbn[maxI]
         mean_list = g_iguest_dist_mean_list
         std_list = g_iguest_std_list
         emb_list = g_iguest_embedding_list
+    '''
     '''
     else:
         #info_print('OGuest Group')
@@ -259,11 +263,11 @@ def infer(fileName, mode):
         emb_list = g_oguest_embedding_list
     '''
 
-    print "\n   DBN: ", person_dbn, confidence_dbn
-    print "   SVM: ", person, confidence
+    #print "\n   DBN: ", person_dbn, confidence_dbn
+    print "   SVM: ", person[0], confidence
 
-    if person != person_dbn:
-        return 'Unknown', 0
+    #if person != person_dbn:
+    #    return 'Unknown', 0
 
     #if confidence < 0.85:  # Hard limit
     #    return person, confidence
@@ -274,12 +278,14 @@ def infer(fileName, mode):
 
     #avgt = np.mean([confidence_dbn, confidence])
 
-    avgt = leaky * confidence_dbn + (1 - leaky) * confidence
-    confidence = avgt
+    #avgt = leaky * confidence_dbn + (1 - leaky) * confidence
+    #confidence = avgt
 
-    print '   AVG: ', avgt
+    #print '   AVG: ', avgt
 
     margin = 0 #0.05
+    avgt = confidence
+    person = person[0]
 
     if mode == 'user':
         if avgt < threshold + margin:
@@ -304,15 +310,16 @@ def infer(fileName, mode):
 
                 print '   DIST: ', m, thd
 
-                c = np.array([confidence_dbn, confidence])
+                #c = np.array([confidence_dbn, confidence])
 
                 if m < thd:
-                    confidence = avgt   #c.max()
+                    confidence = threshold   #c.max()
                 else:
-                    confidence = c.min()
+                    confidence = avgt  #c.min()
 
         else:
             confidence = avgt
+    '''
     else:
         c = np.array([confidence_dbn, confidence])
 
@@ -349,7 +356,7 @@ def infer(fileName, mode):
 
         else:
             confidence = avgt
-
+    '''
     return person, confidence
 
 
@@ -520,7 +527,7 @@ def handler(signum, frame):
 
 def main():
     if redis_ready is False:
-        #debug_print('REDIS not ready.')
+        print 'REDIS not ready.'
         return
 
     cur_target_frame = -1
@@ -539,13 +546,17 @@ def main():
 
     initialize_rep_distance_list(embeddings_dir, g_dist_min_list, g_dist_mean_list, g_std_list, g_embedding_list)
 
-    embeddings_dir = os.path.dirname(os.path.realpath(__file__)) + '/../face_register/output/embedding/iguest'
+    #embeddings_dir = os.path.dirname(os.path.realpath(__file__)) + '/../face_register/output/embedding/iguest'
 
-    initialize_rep_distance_list(embeddings_dir, g_iguest_dist_min_list, g_iguest_dist_mean_list, g_iguest_std_list, g_iguest_embedding_list)
+    #initialize_rep_distance_list(embeddings_dir, g_iguest_dist_min_list, g_iguest_dist_mean_list, g_iguest_std_list, g_iguest_embedding_list)
 
     #embeddings_dir = os.path.dirname(os.path.realpath(__file__)) + '/../face_register/output/embedding/oguest'
 
     #initialize_rep_distance_list(embeddings_dir, g_oguest_dist_min_list, g_oguest_dist_mean_list, g_oguest_std_list, g_oguest_embedding_list)
+
+    #person, confidence = infer(os.path.dirname(os.path.realpath(__file__)) + '/../face_register/input/user/BaekSeongho/17_19_33_53_5.jpg_w.jpg', 'user')
+
+    #info_print("\n   User Group:" + person[0] + '(' + str(int(100 * confidence)) + '%)')
 
     try:
         for item in p.listen():
@@ -688,10 +699,10 @@ if __name__ == "__main__":
     os_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, handler)
 
-    sys.stdout = Logger()
+    #sys.stdout = Logger()
 
-    threshold = 0.95
-    fn_threshold = 0.8
+    threshold = 0.8
+    fn_threshold = 0.6
     alpha = 1.64  # 95%: 1.96, 90 %: 1.64
     show_time = False
     debug = False
@@ -740,7 +751,8 @@ if __name__ == "__main__":
 
     HOST, PORT = "127.0.0.1", 55555
     # HOST, PORT = "10.100.0.53", 55555
-    REDIS_SERVER = '127.0.0.1'
+    REDIS_SERVER = '10.144.164.202'
+    #REDIS_SERVER = '127.0.0.1'
     REDIS_PORT = 6379
     parser = argparse.ArgumentParser()
 
@@ -769,15 +781,17 @@ if __name__ == "__main__":
         p.subscribe('camera')
         redis_ready = True
 
+        info_print('Connected to Message Queue')
     except:
         redis_ready = False
+        info_print('Faile to connect to Message Queue')
 
     (le, clf) = pickle.load(open(baseDir + '/svm/classifier.pkl', 'r'))
-    (le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
+    #(le_dbn, clf_dbn) = pickle.load(open(baseDir + '/dbn/classifier.pkl', 'r'))
 
     # Individual Guest Group
-    (le_iguest, clf_iguest) = pickle.load(open(baseDir + '/svm/classifier_iguest.pkl', 'r'))
-    (le_dbn_iguest, clf_dbn_iguest) = pickle.load(open(baseDir + '/dbn/classifier_iguest.pkl', 'r'))
+    #(le_iguest, clf_iguest) = pickle.load(open(baseDir + '/svm/classifier_iguest.pkl', 'r'))
+    #(le_dbn_iguest, clf_dbn_iguest) = pickle.load(open(baseDir + '/dbn/classifier_iguest.pkl', 'r'))
 
     # Overall Guest Group
     # (le_oguest, clf_oguest) = pickle.load(open(baseDir + '/svm/classifier_oguest.pkl', 'r'))
@@ -790,8 +804,9 @@ if __name__ == "__main__":
         sock.connect((HOST, PORT))
         sock_ready = True
 
-        # debug_print('Connected')
+        info_print('Connected to Edge Camera')
     except:
+        info_print('Faile to connect to Edge Camera')
         sock_ready = False
 
     main()
