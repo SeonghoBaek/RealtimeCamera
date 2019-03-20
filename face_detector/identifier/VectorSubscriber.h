@@ -1,33 +1,96 @@
 //
-// Created by major on 17. 1. 5.
+// Created by major on 17. 1. 6.
 //
 
-#ifndef REALTIMECAMERA_VECTORSUBSCRIBER_H
-#define REALTIMECAMERA_VECTORSUBSCRIBER_H
+#ifndef REALTIMECAMERA_VECTORNETSUBSCRIBER_H
+#define REALTIMECAMERA_VECTORNETSUBSCRIBER_H
 
-#include "Common.h"
+
+#include <netinet/in.h>
 #include "Thread.h"
-#include "RedisIO.h"
+#include "VectorQueue.h"
+#include "VectorClassFinder.h"
+#include "Lock.h"
 
-class VectorSubscriber:public Thread, public IAsyncCallback {
+#define SOCKET_TIME_OUT			1000 // mili
+#define SOCK_PAGE_SIZE          4096
+
+typedef struct ClientAddress
+{
+    char ipstr[INET6_ADDRSTRLEN+1];
+    int  port;
+} ClientAddress_t;
+
+class VectorNetSubscriber: public Thread{
 private:
-    RedisIO *mpRedis;
-    AsyncRedisIO *mpAsyncRedis;
+    int     mSd;
+    int     mClientSd;
+    int     mPort;
+    char    mIpStr[INET6_ADDRSTRLEN+1];
+    char    mBuff[SOCK_PAGE_SIZE];
+    IVectorNotifier *mpNotifier;
+    Mutex_t mLock;
 
-    char *mpServer;
-    int mPort;
-    char *mpChannel;
+    int acceptOnSocket(int sd, struct ClientAddress* pClientAddr);
+    int setupServerSocket(const char *address, int port);
+    int receiveFromSocket(int sd, void* buffer, size_t bufferSize);
+    int safeRead(void *buff, unsigned int length, int timeout);
+    int sendToSocket(int sd, const void* buffer, size_t bufferSize);
 
 public:
-    IMPLEMENT_THREAD(run());
+    IMPLEMENT_THREAD(this->run());
 
-    VectorSubscriber(const char *server, int port, const char *channel);
+    VectorNetSubscriber(const char* ipString, int port)
+    {
+        if (ipString == NULL) // Local Host
+        {
+            sprintf(mIpStr, "%s", "127.0.0.1");
+        }
+        else
+        {
+            sprintf(mIpStr, "%s", ipString);
+        }
 
-    virtual ~VectorSubscriber();
+        mPort = port;
+        mSd = -1;
+        mClientSd = -1;
+        mpNotifier = NULL;
+        mLock = Lock::createMutex();
+    }
 
-    void onMessage(const char*) override;
+    VectorNetSubscriber(const char* ipString, int port, IVectorNotifier *pNotifier)
+    {
+        if (ipString == NULL) // Local Host
+        {
+            sprintf(mIpStr, "%s", "127.0.0.1");
+        }
+        else
+        {
+            sprintf(mIpStr, "%s", ipString);
+        }
+
+        mPort = port;
+        mSd = -1;
+        mClientSd = -1;
+        mpNotifier = pNotifier;
+        mLock = Lock::createMutex();
+    }
+
+    virtual ~VectorNetSubscriber()
+    {
+        if (mLock) Lock::deleteMutex(mLock);
+    }
+
+    void setVectorNotifier(IVectorNotifier* pNotifier)
+    {
+        LOCK(mLock)
+        {
+            this->mpNotifier = pNotifier;
+        }
+    }
 
     void run();
 };
 
-#endif //REALTIMECAMERA_VECTORSUBSCRIBER_H
+
+#endif //REALTIMECAMERA_VECTORNETSUBSCRIBER_H
