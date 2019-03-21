@@ -467,7 +467,7 @@ def main():
                     next_target_frame = int(frame_str)
 
                     if recv_frame == cur_target_frame or recv_frame == next_target_frame:
-                        fileName = "/tmp/input.jpg"
+                        fileName = '/tmp/input' + redis_channel + '.jpg'
                         jpgFile = open(fileName, "wb")
                         jpgFile.write(ar)
                         jpgFile.close()
