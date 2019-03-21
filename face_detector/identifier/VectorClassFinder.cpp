@@ -613,7 +613,7 @@ int VectorClassFinder::looperCallback(const char *event) {
     {
         if (pV->mConfidence < CONFIDENCE_LEVEL)
         {
-            LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
+            LOGD("Confidence(%f) low. Ignore %s\n", pV->mConfidence, this->mpLabels[pV->mLabelIndex].getLabel());
 
             this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
             this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
@@ -635,304 +635,48 @@ int VectorClassFinder::looperCallback(const char *event) {
             return 0;
         }
 
-        if (this->mpActiveLabelList == NULL)
+        int labelState = this->mpLabels[pV->mLabelIndex].getX();
+        int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
+
+        if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF) // Too old from first identification.
+        {
+            this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
+            //LOGD("Version Diff:%d, %s label state: %d\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[pV->mLabelIndex].getX());
+        }
+
+        LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
+
+        if (labelState < LABEL_READY_STATE)
         {
             /*
-            if (pV->mConfidence < 0.9)
-            {
-                LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
+             * example)
+             * INVALIDATE_STATE = -3
+             * READY_STATE = -1
+             * VALID_STATE = 1
+             * To be registered as a new identified face, state should be valid state.
+             * From INVALIDATE_STATE, we need number of [READY_STATE - INVALIDATE_STATE] identified faces.
+             */
+            this->mpLabels[pV->mLabelIndex].setX(labelState + 1); // STATE Version Up
+            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+        } else if (labelState == LABEL_READY_STATE) {
+            LOGD("Find New Face: %s", this->mpLabels[pV->mLabelIndex].getLabel());
 
-                this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-
-                delete pV;
-
-                return 0;
-            }
-            */
-
-            int labelState = this->mpLabels[pV->mLabelIndex].getX();
-
-            if (labelState != LABEL_READY_STATE)
-            {
-                if (labelState == LABEL_INVALIDATE_STATE)
-                {
-                    LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
-                    this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                }
-                else
-                {
-                    int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
-
-                    if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
-                    {
-                        LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
-                        this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    }
-                    else
-                    {
-                        LOGD("Label State %d, %s, %d\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel(), abs(this->mVersion - prevVersion));
-                        this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
-                        this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                    }
-                }
-
-                delete pV;
-                return 0;
-            }
-            /* Why need? Added by Seongho Baek 2019.03.20
-            else
-            {
-                int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
-
-                if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
-                {
-                    LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                    delete pV;
-                    return 0;
-                }
-
-                LOGD("Label State %d, %s, %d\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel(), abs(this->mVersion - prevVersion));
-            }
-            */
-
-            LOGD("Find New Face: %s",  this->mpLabels[pV->mLabelIndex].getLabel());
-
-            this->addNewFace(pV);
+            this->addNewFace(pV); // Now label is VALID_STATE
             this->fireUserEvent(pV->mLabelIndex);
+        } else { // LABEL_VALID_STATE
+            this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE); // For explicit action
+            this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
 
-#if (USE_UPDATE_CHECK == 1)
-            pNewLabel->mUpdateTime = cur;
-            this->mpLabels[pV->mLabelIndex].mUpdateTime = cur; // For fast check.
-#endif
-        }
-        else
-        {
-            int labelState = this->mpLabels[pV->mLabelIndex].getX();
+            //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
 
-            if (labelState == LABEL_VALID_STATE)
-            {
-                if (pV->mConfidence < 0.6)
-                {
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                }
-                else
-                {
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_VALID_STATE); // For explicit action
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
+            this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
+            //LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
 
-                    //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-
-                    this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                    //LOGD("Update %s confidence %f", this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
-                }
-#if (USE_UPDATE_CHECK == 1)
-                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
-#endif
-            }
-            else if (labelState < LABEL_READY_STATE)
-            {
-                /*
-                if (pV->mConfidence < 0.9)
-                {
-                    LOGD("Confidence low. Ignore %s\n", this->mpLabels[pV->mLabelIndex].getLabel());
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                    delete pV;
-                    return 0;
-                }
-                */
-
-                LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
-
-                if (labelState != LABEL_INVALIDATE_STATE)
-                {
-                    int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
-
-                    if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
-                    {
-                        LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
-                        this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                        this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                        delete pV;
-                        return 0;
-                    }
-                }
-
-                this->mpLabels[pV->mLabelIndex].setX(labelState + 1);
-                this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-            }
-            else if (labelState == LABEL_READY_STATE)// -1
-            {
-                /*
-                int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
-
-                if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF)
-                {
-                    LOGD("Version Diff:%d, Ignore %s\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel());
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                    delete pV;
-                    return 0;
-                }
-                */
-
-                /*
-                if (pV->mConfidence < 0.9)
-                {
-                    this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                    delete pV;
-                    return 0;
-                }
-                */
-
-                // Simple Approach
-
-                LOGD("Find New User: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-
-                this->addNewFace(pV);
-                this->fireUserEvent(pV->mLabelIndex);
-
-#if (USE_UPDATE_CHECK == 1)
-                this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
-#endif
-                /*
-                LabelListItem *pHead = this->mpActiveLabelList;
-
-
-               while (pHead != NULL)
-               {
-                   int labelIndex = pHead->mpLabel->mLabelIndex;
-
-                   float iou = this->getIoU(this->mpLabels[labelIndex].mLeft,
-                                            this->mpLabels[labelIndex].mRight,
-                                            this->mpLabels[labelIndex].mTop,
-                                            this->mpLabels[labelIndex].mBottom,
-                                            pV->mX, pV->mY, pV->mT, pV->mB);
-
-                   LOGD("IoU: %f, New : %s, Cur: %s", iou, this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[labelIndex].getLabel());
-
-                   if (iou > IOU_INTERSECT_NEW_USER)
-                   {
-                       LOGD("Confidence New: %f, Cur: %f", pV->mConfidence, this->mpLabels[labelIndex].mConfidence);
-                       if (this->mpLabels[labelIndex].mConfidence < pV->mConfidence)
-                       {
-                           if (this->mpLabels[labelIndex].getX() == 0 && pV->mConfidence > 0.9)
-                           {
-                               pHead->mpLabel->mLabelIndex = pV->mLabelIndex;
-
-                               LOGD("Believe: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-
-                               if (gTTSRedisContext)
-                               {
-                                   char id[3];
-                                   sprintf(id, "%d", pV->mLabelIndex);
-
-                                   redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
-                               }
-
-                               this->mpLabels[pV->mLabelIndex].setX(1);
-                               this->mpLabels[pV->mLabelIndex].setY(1);
-                               //this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-                               this->mpLabels[pV->mLabelIndex].mConfidence = pV->mConfidence;
-                               this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-
-                               this->mpLabels[labelIndex].setX(-1); // Clear
-                           }
-                           else
-                           {
-                               LOGD("One more try: %s", this->mpLabels[labelIndex].getLabel());
-                               this->mpLabels[labelIndex].setX(0); // Give a more try;
-                               this->mpLabels[labelIndex].mVersion = this->mVersion;
-                           }
-                       }
-                       else
-                       {
-                           if (this->mpLabels[labelIndex].getX() == 0)
-                           {
-                               this->mpLabels[labelIndex].setX(1);
-                               this->mpLabels[labelIndex].mVersion = this->mVersion;
-                               LOGD("Dismiss: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-                           }
-                           else
-                           {
-                               LOGD("Ignore: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-                           }
-                       }
-
-                       break;
-                   }
-
-                   pHead = pHead->mpNext;
-               }
-
-
-                if (pHead == NULL && pV->mConfidence > 0.9)
-                {
-                    LOGD("Find New User: %s", this->mpLabels[pV->mLabelIndex].getLabel());
-
-                    LabelListItem *pItem = new LabelListItem();
-
-                    if (pItem == NULL)
-                    {
-                        delete pV;
-
-                        return -1;
-                    }
-
-                    pItem->mpLabel = new Label();
-
-                    if (pItem->mpLabel == NULL)
-                    {
-                        delete pItem;
-
-                        return -1;
-                    }
-
-                    Label *pNewLabel = pItem->mpLabel;
-
-                    pNewLabel->mLabelIndex = pV->mLabelIndex;
-
-                    this->mpLabels[pV->mLabelIndex].setX(1);
-                    this->mpLabels[pV->mLabelIndex].setY(1);
-                    this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-                    this->updateLabel(&this->mpLabels[pV->mLabelIndex], pV);
-
-                    pItem->mpNext = this->mpActiveLabelList;
-                    this->mpActiveLabelList->mpPrev = pItem;
-
-                    this->mpActiveLabelList = pItem;
-
-#if (USE_UPDATE_CHECK == 1)
-                    this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
-#endif
-
-                    if (gTTSRedisContext)
-                    {
-                        char id[3];
-                        sprintf(id, "%d", pV->mLabelIndex);
-
-                        redisCommand(gTTSRedisContext, "PUBLISH %s %s", "tts", id);
-                    }
-
-                    {
-                        this->sendToBridge("robot_bridge", (void *)"open", 4);
-                    }
-                }
-                */
-            }
+            #if (USE_UPDATE_CHECK == 1)
+            this->mpLabels[pV->mLabelIndex].mUpdateTime = cur;
+            #endif
         }
     }
-
 #else
 
     LOCK(this->mFrameLock)
