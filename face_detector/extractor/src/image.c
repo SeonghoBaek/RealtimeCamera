@@ -275,19 +275,51 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
 
             //printf("w: %d, h: %d\n", right - left, bot - top);
 
-            if (right-left > 140)
+            if (right-left > 160)
             {
                 printf("Too large face, width: %d, Ignore\n", right-left);
                 continue;
             }
 
-            if (right-left < 40)
+            if (right-left < 30)
             {
                 printf("Too small face, width: %d, Ignore\n", right-left);
                 continue;
             }
 
-            if (gUploadStep == 0)
+            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, gBoxRGB[0], gBoxRGB[1], gBoxRGB[2]);
+
+            if (alphabet)
+            {
+                if (need_reset_label_check_info == 1)
+                {
+                    clear_label_check_info();
+                    need_reset_label_check_info = 0;
+                }
+
+                //printf("get label\n");
+                strlabel = get_label_in_box(left, top, right, bot);
+
+#ifdef USE_SRC
+                if (gUploadStep == 0 && strlen(strlabel) > 1)
+                {
+                    //printf("image file: %s\n", img_file_name);
+                    if (test_image_file(img_file_name, strlabel) == -1)
+                    {
+                        strlabel = "";
+                    }
+                }
+#endif
+
+                if (strlen(strlabel) > 1)
+                {
+                    image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
+
+                    draw_label(im, padded_top + width, padded_left, label, gBoxRGB);
+                }
+            }
+
+            if (gUploadStep == 0 && strlen(strlabel) <= 1)
             {
                 unsigned char   *payload = NULL;
                 FILE            *p_img_file = NULL;
@@ -360,38 +392,6 @@ int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh,
 
                 //printf("free box image\n");
                 free_image(box_image);
-            }
-
-            draw_box_width(im, padded_left, padded_top, padded_right, padded_bot, width, gBoxRGB[0], gBoxRGB[1], gBoxRGB[2]);
-
-            if (alphabet)
-            {
-                if (need_reset_label_check_info == 1)
-                {
-                    clear_label_check_info();
-                    need_reset_label_check_info = 0;
-                }
-
-                //printf("get label\n");
-                strlabel = get_label_in_box(left, top, right, bot);
-
-#ifdef USE_SRC
-                if (gUploadStep == 0 && strlen(strlabel) > 1)
-                {
-                    //printf("image file: %s\n", img_file_name);
-                    if (test_image_file(img_file_name, strlabel) == -1)
-                    {
-                        strlabel = "";
-                    }
-                }
-#endif
-
-                if (strlen(strlabel) > 1)
-                {
-                    image label = get_label(alphabet, strlabel, (im.h * .03) / 10);
-
-                    draw_label(im, padded_top + width, padded_left, label, gBoxRGB);
-                }
             }
         }
 
