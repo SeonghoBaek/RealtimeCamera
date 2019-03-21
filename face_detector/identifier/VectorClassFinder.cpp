@@ -20,7 +20,7 @@ using namespace std;
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define USE_TRACKING 1
-#define LABEL_VERSION_DIFF 15
+#define LABEL_VERSION_DIFF 7
 
 float CONFIDENCE_LEVEL = 0.96;
 
@@ -31,7 +31,7 @@ float IOU_INTERSECT_TRACKING = 0.4;
 #else
 float IOU_INTERSECT_NEW_USER = 0.5;
 float IOU_INTERSECT_CUR_USER = 0.4;
-float IOU_INTERSECT_TRACKING = 0.5;
+float IOU_INTERSECT_TRACKING = 0.3;
 #endif
 
 #if (USE_ROBOT == 1)
@@ -113,6 +113,7 @@ void VectorClassFinder::updateLabel(Label *pLabel, Vector *pV)
 char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bottom)
 {
     int   max_iou_index = -1;
+    float max_iou = 0.0;
     float IOU = IOU_INTERSECT_TRACKING;
 
 #if (USE_UPDATE_CHECK == 1)
@@ -139,13 +140,33 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
 
         while (pItem != NULL)
         {
-            //if (pItem->mpLabel->mChecked == 0)
+            /*
+             * Added by Seongho Baek 2019.03.20
+             */
+            if (this->mpLabels[pItem->mpLabel->mLabelIndex].getX() == LABEL_VALID_STATE)
             {
+                int labelIndex = pItem->mpLabel->mLabelIndex;
+
+                float iou = this->getIoU(left, right, top, bottom,
+                                         this->mpLabels[labelIndex].mLeft,  this->mpLabels[labelIndex].mRight,
+                                         this->mpLabels[labelIndex].mTop, this->mpLabels[labelIndex].mBottom);
+
+                //LOGD("iou: %f", iou);
+
+                if (iou > max_iou)
+                {
+                    max_iou_index = labelIndex;
+                    max_iou = iou;
+                    //IOU = iou;
+
+                    //LOGD("OK Still %s", this->mpLabels[index].getLabel());
+                }
+
+                /* Commented out by Seongho Baek 2019.03.20
                 //LOGD("Version: %d", abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion));
                 int invalidate = 0;
                 int tooOld = 0;
 
-                /*
                 if (this->mpLabels[pItem->mpLabel->mLabelIndex].getX() == LABEL_INVALIDATE_STATE)
                 {
                     invalidate = 1;
@@ -200,7 +221,6 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                     }
                 }
                 else
-                */
                 {
                     int labelIndex = pItem->mpLabel->mLabelIndex;
 
@@ -218,6 +238,7 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
                         //LOGD("OK Still %s", this->mpLabels[index].getLabel());
                     }
                 }
+                */
             }
 
             if (pItem != NULL) pItem = pItem->mpNext;
@@ -285,18 +306,23 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
     {
         return "";
     }
+
+    if (max_iou < IOU)
+    {
+        return "";
+    }
     else
     {
         this->mpLabels[max_iou_index].mRight = right;
         this->mpLabels[max_iou_index].mLeft = left;
         this->mpLabels[max_iou_index].mTop = top;
         this->mpLabels[max_iou_index].mBottom = bottom;
-        //this->mpLabels[max_iou_index].mVersion = this->mVersion;
+        this->mpLabels[max_iou_index].mVersion = this->mVersion;
         this->mpLabels[max_iou_index].mChecked = 1;
 
-#if (USE_UPDATE_CHECK == 1)
+        #if (USE_UPDATE_CHECK == 1)
         LOGD("latency: %f for %s", (float)(cur - this->mpLabels[max_iou_index].mUpdateTime), this->mpLabels[max_iou_index].getLabel());
-#endif
+    #endif
     }
 
     return this->mpLabels[max_iou_index].getLabel();
@@ -783,7 +809,7 @@ int VectorClassFinder::invalidate()
 
         while (pItem != NULL)
         {
-            if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > RESET_FREQ)
+            if (abs(this->mpLabels[pItem->mpLabel->mLabelIndex].mVersion - this->mVersion) > LABEL_VERSION_DIFF)
             {
                 this->mpLabels[pItem->mpLabel->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
                 this->mpLabels[pItem->mpLabel->mLabelIndex].mConfidence = 0.85;
