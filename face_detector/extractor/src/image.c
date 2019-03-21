@@ -200,7 +200,7 @@ float   gBoxRGB[] = {0.95, 0.95, 0.95};
 int     redis_channel_index = 0;
 char    *p_redis_channel[] = {"camera1", "camera2"};
 char    *p_redis_frame[] = {"frame1", "frame2"};
-#define UPLOAD_STEP 4
+#define UPLOAD_STEP 1
 
 int draw_and_send_detections(redisContext *pRC, image im, int num, float thresh, box *boxes, float **probs, char **names, image **alphabet, int frameNum)
 {
