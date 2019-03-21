@@ -31,7 +31,7 @@ float IOU_INTERSECT_TRACKING = 0.4;
 #else
 float IOU_INTERSECT_NEW_USER = 0.5;
 float IOU_INTERSECT_CUR_USER = 0.4;
-float IOU_INTERSECT_TRACKING = 0.3;
+float IOU_INTERSECT_TRACKING = 0.6;
 #endif
 
 #if (USE_ROBOT == 1)
@@ -320,9 +320,11 @@ char* VectorClassFinder::getClosestIoULabel(int left, int right, int top, int bo
         this->mpLabels[max_iou_index].mVersion = this->mVersion;
         this->mpLabels[max_iou_index].mChecked = 1;
 
+        LOGD("By IoU Tracking: %s", this->mpLabels[max_iou_index].getLabel());
+
         #if (USE_UPDATE_CHECK == 1)
         LOGD("latency: %f for %s", (float)(cur - this->mpLabels[max_iou_index].mUpdateTime), this->mpLabels[max_iou_index].getLabel());
-    #endif
+        #endif
     }
 
     return this->mpLabels[max_iou_index].getLabel();
@@ -639,7 +641,7 @@ int VectorClassFinder::looperCallback(const char *event) {
     {
         if (pV->mConfidence < CONFIDENCE_LEVEL)
         {
-            LOGD("Confidence(%f) low. Ignore %s\n", pV->mConfidence, this->mpLabels[pV->mLabelIndex].getLabel());
+            LOGD("Confidence(%f) low, %s, Reset to state %d\n", pV->mConfidence, this->mpLabels[pV->mLabelIndex].getLabel(), LABEL_INVALIDATE_STATE);
 
             this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
             this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
@@ -661,18 +663,21 @@ int VectorClassFinder::looperCallback(const char *event) {
             return 0;
         }
 
-        int labelState = this->mpLabels[pV->mLabelIndex].getX();
         int prevVersion = this->mpLabels[pV->mLabelIndex].mVersion;
 
         if (abs(this->mVersion - prevVersion) > LABEL_VERSION_DIFF) // Too old from first identification.
         {
             this->mpLabels[pV->mLabelIndex].setX(LABEL_INVALIDATE_STATE);
-            //LOGD("Version Diff:%d, %s label state: %d\n", abs(this->mVersion - prevVersion), this->mpLabels[pV->mLabelIndex].getLabel(), this->mpLabels[pV->mLabelIndex].getX());
+            LOGD("Too old. VerDiff:%d, %s label state: %d, Confidence: %f\n",
+                    abs(this->mVersion - prevVersion),
+                    this->mpLabels[pV->mLabelIndex].getLabel(),
+                    this->mpLabels[pV->mLabelIndex].getX(),  pV->mConfidence);
+        } else {
+            LOGD("Label State %d, %s, Confidence: %f\n", this->mpLabels[pV->mLabelIndex].getX(),
+                 this->mpLabels[pV->mLabelIndex].getLabel(), pV->mConfidence);
         }
 
-        LOGD("Label State %d, %s\n", labelState, this->mpLabels[pV->mLabelIndex].getLabel());
-
-        if (labelState < LABEL_READY_STATE)
+        if (this->mpLabels[pV->mLabelIndex].getX() < LABEL_READY_STATE)
         {
             /*
              * example)
@@ -682,9 +687,9 @@ int VectorClassFinder::looperCallback(const char *event) {
              * To be registered as a new identified face, state should be valid state.
              * From INVALIDATE_STATE, we need number of [READY_STATE - INVALIDATE_STATE] identified faces.
              */
-            this->mpLabels[pV->mLabelIndex].setX(labelState + 1); // STATE Version Up
+            this->mpLabels[pV->mLabelIndex].setX(this->mpLabels[pV->mLabelIndex].getX() + 1); // STATE Version Up
             this->mpLabels[pV->mLabelIndex].mVersion = this->mVersion;
-        } else if (labelState == LABEL_READY_STATE) {
+        } else if (this->mpLabels[pV->mLabelIndex].getX() == LABEL_READY_STATE) {
             LOGD("Find New Face: %s", this->mpLabels[pV->mLabelIndex].getLabel());
 
             this->addNewFace(pV); // Now label is VALID_STATE
