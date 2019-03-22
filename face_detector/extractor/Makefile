@@ -2,8 +2,8 @@ GPU=1
 CUDNN=1
 OPENCV=1
 REDIS=1
-SHOW_WINDOW=0
-SUPPORT_SECOND_CAMERA=1
+SHOW_WINDOW=1
+SUPPORT_SECOND_CAMERA=0
 DEBUG=0
 
 ARCH= -gencode arch=compute_20,code=[sm_20,sm_21] \
@@ -67,8 +67,8 @@ COMMON+= -DSHOW_WINDOW
 CFLAGS+= -DSHOW_WINDOW
 endif
 
-COMMON += -I../identifier -I../sparse
-LDFLAGS += -L../lib -lidentifier -lsparse
+COMMON += -I../identifier 
+LDFLAGS += -L../lib -lidentifier 
 
 OBJ=gemm.o utils.o cuda.o convolutional_layer.o list.o image.o activations.o im2col.o col2im.o blas.o crop_layer.o dropout_layer.o maxpool_layer.o softmax_layer.o data.o matrix.o network.o connected_layer.o cost_layer.o parser.o option_list.o darknet.o detection_layer.o captcha.o route_layer.o writing.o box.o nightmare.o normalization_layer.o avgpool_layer.o coco.o dice.o yolo.o detector.o layer.o compare.o classifier.o local_layer.o swag.o shortcut_layer.o activation_layer.o rnn_layer.o gru_layer.o rnn.o rnn_vid.o crnn_layer.o camera.o tag.o cifar.o go.o batchnorm_layer.o art.o region_layer.o reorg_layer.o super.o voxel.o tree.o
 ifeq ($(GPU), 1) 

@@ -1,4 +1,4 @@
-SUBDIRS = sparse identifier extractor
+SUBDIRS = identifier extractor
 
 .PHONY : all target $(SUBDIRS) clean
 
