@@ -15,6 +15,7 @@ import dlib
 import argparse
 import csv
 import pickle
+import shutil
 
 
 LAMBDA = 0.1
@@ -277,9 +278,14 @@ def train(model_path):
 
     # Concat or Transform Here
     #representation = tf.concat([fc_representation, TripletX], 1)
-    gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim], initializer=tf.constant_initializer(0.0))
-    #gamma = tf.nn.softmax(gamma)  # Attention
-    gamma = tf.nn.sigmoid(gamma)
+    gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim],
+                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+    gamma = tf.nn.softmax(gamma)  # Attention
+    scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
+                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+    #gamma = tf.nn.sigmoid(gamma)
+    gamma = tf.multiply(gamma, scale)
+
     representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
 
     prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
@@ -292,7 +298,12 @@ def train(model_path):
     update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
     entropy_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=0.1))
 
-    total_loss = entropy_loss + center_loss * LAMBDA
+    # L1 BN
+    t_val_list = [tf.reduce_sum(tf.abs(var)) for var in tf.trainable_variables() if 'gamma' in var.name]
+    L1_penalty = tf.reduce_sum(t_val_list)
+    scale = 0.001
+
+    total_loss = entropy_loss + center_loss * LAMBDA + scale * L1_penalty
 
     train_op = tf.train.AdamOptimizer(0.003).minimize(total_loss)
 
@@ -352,8 +363,43 @@ def int_from_bytes(b3, b2, b1, b0):
     return (((((b3 << 8) + b2) << 8) + b1) << 8) + b0
 
 
+def save_unknown_user(src, dirname=None, candidate=None, confidence=0.0):
+    target_dir = dirname
+    name = candidate
+
+    if candidate is None:
+        name = 'face'
+
+    '''
+    if target_dir is None:
+        target_dir = inputDir + '/../Unknown/' + time.strftime("%d_%H_%M_%S")
+
+    if not os.path.exists(target_dir):
+        os.mkdir(target_dir)
+
+    if len(os.listdir(target_dir)) > 256:
+        target_dir = inputDir + '/../Unknown/' + time.strftime("%d_%H_%M_%S")
+        if not os.path.exists(target_dir):
+            os.mkdir(target_dir)
+
+    #print("Save unknown to " + target_dir)
+    '''
+
+    if not os.path.exists(target_dir + '/' + name):
+        os.mkdir(target_dir + '/' + name)
+
+    fileSeqNum = 1 + len(os.listdir(target_dir + '/' + name))
+    #faceFile = target_dir + "/" + name + "/" + name + "_" + str(confidence) + time.strftime("_%d_%H_%M_%S_") + str(fileSeqNum) + ".jpg"
+    faceFile = target_dir + "/" + name + "/" + name + "_" + str(confidence) + "_" + str(fileSeqNum) + ".jpg"
+
+    shutil.move(src, faceFile)
+
+    return target_dir
+
+
 def test(model_path):
-    print('Test Mode')
+    threshold = 0.5
+    print('Serving Mode, threshold: ' + str(threshold))
 
     X = tf.placeholder("float", [None, input_height, input_width, num_channel])
     Y = tf.placeholder("float", [None, num_class_per_group])
@@ -375,8 +421,12 @@ def test(model_path):
     # Concat or Transform Here
     # representation = tf.concat([fc_representation, TripletX], 1)
     gamma = tf.get_variable("gamma", shape=[representation_dim], initializer=tf.constant_initializer(0.0))
-    #gamma = tf.nn.softmax(gamma)  # Attention
-    gamma = tf.nn.sigmoid(gamma)
+    scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
+                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+    gamma = tf.nn.softmax(gamma)  # Attention
+    # gamma = tf.nn.sigmoid(gamma)
+    gamma = tf.multiply(gamma, scale)
+
     representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
 
     prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
@@ -559,6 +609,14 @@ def test(model_path):
                                     '''
                                 print('\nPerson: ' + person + ', Confidence: ' + str(confidence * 100) + '%')
 
+                                if confidence < 0.8:
+                                    save_unknown_user(fileName, dirname, 'Unknown', confidence)
+                                else:
+                                    save_unknown_user(fileName, dirname, person, confidence)
+
+                                if confidence < threshold:
+                                    person = 'Unknown'
+
                             if sock_ready is True:
                                 if person != 'Unknown' and person != 'Nobody':
                                     b_array = bytes()
@@ -586,6 +644,7 @@ if __name__ == '__main__':
     parser.add_argument('--data', type=str, help='data source base directory', default='./input')
     parser.add_argument('--out', type=str, help='output directory', default='./out/embedding')
     parser.add_argument('--train_data', type=str, help='training data directory', default='input')
+    parser.add_argument('--test_data', type=str, help='test data directory', default='./test_data')
     parser.add_argument('--label', type=str, help='training data directory', default='input')
 
     args = parser.parse_args()
@@ -640,9 +699,13 @@ if __name__ == '__main__':
 
             # Concat or Transform Here
             # representation = tf.concat([fc_representation, TripletX], 1)
-            gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim], initializer=tf.constant_initializer(0.0))
-            #gamma = tf.nn.softmax(gamma)
-            gamma = tf.nn.sigmoid(gamma)
+            gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim], initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+            scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
+                                    initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+            gamma = tf.nn.softmax(gamma)  # Attention
+            # gamma = tf.nn.sigmoid(gamma)
+            gamma = tf.multiply(gamma, scale)
+
             representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
 
             prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
@@ -686,8 +749,80 @@ if __name__ == '__main__':
 
                 label_f.close()
                 embedding_f.close()
+    elif mode == 'fpr':
+        test_data_dir = args.test_data
+        inputDir = './input'
+        label_list = [d for d in os.listdir(inputDir + '/user') if os.path.isdir(inputDir + '/user/' + d)]
 
+        num_class_per_group = len(label_list)
 
+        X = tf.placeholder("float", [None, input_height, input_width, num_channel])
+        Y = tf.placeholder("float", [None, num_class_per_group])
+        TripletX = tf.placeholder("float", [None, representation_dim])
+        bn_train = tf.placeholder(tf.bool)
+        keep_prob = tf.placeholder(tf.float32)
 
+        # Network setup
+        cnn_representation = cnn_network(X, bn_phaze=bn_train)
+        print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
+        cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim)
+        print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
+        fc_representation = cnn_representation
+
+        # fc_representation = fc_network(cnn_representation, bn_phaze=bn_train)
+
+        # Concat or Transform Here
+        # representation = tf.concat([fc_representation, TripletX], 1)
+        gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim],
+                                initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+        scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
+                                initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
+        gamma = tf.nn.softmax(gamma)  # Attention
+        # gamma = tf.nn.sigmoid(gamma)
+        gamma = tf.multiply(gamma, scale)
+
+        representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
+
+        prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
+
+        with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
+            centers = tf.get_variable('centers', [num_class_per_group, g_fc_layer3_dim], dtype=tf.float32,
+                                      initializer=tf.constant_initializer(0), trainable=False)
+
+        center_loss = get_center_loss(representation, tf.argmax(Y, 1))
+        update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
+        entropy_loss = tf.reduce_mean(
+            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=0.1))
+
+        total_loss = entropy_loss + center_loss * LAMBDA
+
+        train_op = tf.train.AdamOptimizer(0.003).minimize(total_loss)
+
+        predict_op = tf.argmax(tf.nn.softmax(prediction), 1)
+        confidence_op = tf.nn.softmax(prediction)
+
+        # Launch the graph in a session
+        with tf.Session() as sess:
+            sess.run(tf.global_variables_initializer())
+
+            try:
+                saver = tf.train.Saver()
+                saver.restore(sess, model_path)
+                print('Model loaded')
+            except:
+                print('Model load failed: ' + model_path)
+
+            for idx, labelname in enumerate(os.listdir(test_data_dir)):
+                print('label:' + labelname)
+
+                #imgs_list = load_images_from_folder(os.path.join(test_data_dir, labelname))
+                label_dir = os.path.join(test_data_dir, labelname).replace("\\", "/")
+                img_files = os.listdir(label_dir)
+
+                for f in img_files:
+                    trep, img = get_triplet_representation_align_image(os.path.join(label_dir, f).replace("\\", "/"))
+
+                    pred_id, confidence = sess.run([predict_op, confidence_op], feed_dict={X: img, TripletX: trep, bn_train: False, keep_prob: 1.0})
+                    print(labelname + ', predict: ' + label_list[pred_id[0]] + ', ' + str(confidence[0][pred_id[0]]))
