@@ -18,7 +18,7 @@ import pickle
 import shutil
 
 
-LAMBDA = 0.1
+LAMBDA = 3e-2
 CENTER_LOSS_ALPHA = 0.5
 
 representation_dim = 128
@@ -27,8 +27,8 @@ input_height = 96
 num_channel = 3
 batch_size = 32
 test_size = 100
-num_class_per_group = 23  
-num_epoch = 10
+num_class_per_group = 46
+num_epoch = 30
 
 # Network Parameters
 g_fc_layer1_dim = 1024
@@ -104,6 +104,24 @@ def fc_network(x, pretrained=False, weights=None, biases=None, activation='swish
         return g_fc_layer3
 
 
+def add_residual_dense_block(in_layer, filter_dims, num_layers, act_func=tf.nn.relu, bn_phaze=False, scope='residual_dense_block'):
+    with tf.variable_scope(scope):
+        l = in_layer
+        input_dims = in_layer.get_shape().as_list()
+        num_channel_in = input_dims[-1]
+        num_channel_out = input_dims[-1]
+
+        for i in range(num_layers):
+            l = layers.add_dense_layer(l, filter_dims=filter_dims, act_func=act_func, bn_phaze=bn_phaze,
+                                       scope='layer' + str(i))
+        l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, num_channel_out], act_func=act_func,
+                                     scope='dense_transition_1', bn_phaze=bn_phaze, use_pool=False)
+
+        l = tf.add(l, in_layer)
+
+    return l
+
+
 def cnn_network(x, activation='swish', scope='cnn_network', reuse=False, bn_phaze=False, keep_prob=0.5):
     with tf.variable_scope(scope):
         if reuse:
@@ -116,7 +134,7 @@ def cnn_network(x, activation='swish', scope='cnn_network', reuse=False, bn_phaz
         else:
             act_func = tf.nn.sigmoid
 
-        l = layers.conv(x, scope='conv1', filter_dims=[3, 3, 256], stride_dims=[1, 1], non_linear_fn=None, bias=False)
+        l = layers.conv(x, scope='conv1', filter_dims=[5, 5, 256], stride_dims=[1, 1], non_linear_fn=None, bias=False)
 
         with tf.variable_scope('dense_block_1'):
             for i in range(g_dense_block_layers):
@@ -125,12 +143,63 @@ def cnn_network(x, activation='swish', scope='cnn_network', reuse=False, bn_phaz
             l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
                                      scope='dense_transition_1', bn_phaze=bn_phaze)
 
+        l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=3,
+                                     act_func=act_func, bn_phaze=bn_phaze, scope='block_1')
+
+        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+        l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=3,
+                                     act_func=act_func, bn_phaze=bn_phaze, scope='block_2')
+
+        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+        l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=3,
+                                     act_func=act_func, bn_phaze=bn_phaze, scope='block_3')
+
+        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+        l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=3,
+                                     act_func=act_func, bn_phaze=bn_phaze, scope='block_4')
+
+        l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=3,
+                                     act_func=act_func, bn_phaze=bn_phaze, scope='block_5')
+
+        with tf.variable_scope('dense_block_last'):
+            for i in range(g_dense_block_layers):
+                l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                           bn_phaze=bn_phaze, scope='layer' + str(i))
+            scale_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth],
+                                                            act_func=act_func,
+                                                            scope='dense_transition_1', bn_phaze=bn_phaze,
+                                                            use_pool=False)
+            last_dense_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth],
+                                                                 act_func=act_func,
+                                                                 scope='dense_transition_2', bn_phaze=bn_phaze,
+                                                                 use_pool=False)
+            scale_layer = act_func(scale_layer)
+            last_dense_layer = act_func(last_dense_layer)
+
+        '''
+        with tf.variable_scope('residual_block_1'):
+            r = layers.add_residual_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer1')
+            r = layers.add_residual_layer(r, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer2')
+            l = tf.add(l, r)
+
         with tf.variable_scope('dense_block_2'):
             for i in range(g_dense_block_layers):
                 l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func, bn_phaze=bn_phaze,
                                     scope='layer' + str(i))
             l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
                                      scope='dense_transition_1', bn_phaze=bn_phaze)
+
+        with tf.variable_scope('residual_block_2'):
+            r = layers.add_residual_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer1')
+            r = layers.add_residual_layer(r, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer2')
+            l = tf.add(l, r)
 
         with tf.variable_scope('dense_block_3'):
             for i in range(g_dense_block_layers):
@@ -139,6 +208,13 @@ def cnn_network(x, activation='swish', scope='cnn_network', reuse=False, bn_phaz
             l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
                                     scope='dense_transition_1', bn_phaze=bn_phaze)
 
+        with tf.variable_scope('residual_block_3'):
+            r = layers.add_residual_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer1')
+            r = layers.add_residual_layer(r, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer2')
+            l = tf.add(l, r)
+
         with tf.variable_scope('dense_block_4'):
             for i in range(g_dense_block_layers):
                 l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func, bn_phaze=bn_phaze,
@@ -146,29 +222,27 @@ def cnn_network(x, activation='swish', scope='cnn_network', reuse=False, bn_phaz
             l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
                                                   scope='dense_transition_1', bn_phaze=bn_phaze)
 
-        with tf.variable_scope('dense_block_5'):
+        with tf.variable_scope('residual_block_4'):
+            r = layers.add_residual_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer1')
+            r = layers.add_residual_layer(r, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
+                                          bn_phaze=bn_phaze, scope='layer2')
+            l = tf.add(l, r)
+        
+        with tf.variable_scope('dense_block_last'):
             for i in range(g_dense_block_layers):
-                l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func, bn_phaze=bn_phaze,
-                                           scope='layer' + str(i))
-            last_dense_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
-                                                    scope='dense_transition_1', bn_phaze=bn_phaze)
-        '''
-        with tf.variable_scope('dense_block_6'):
-            for i in range(g_dense_block_layers):
-                l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func, use_bn=False,
+                l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func,
                                     bn_phaze=bn_phaze, scope='layer' + str(i))
-            l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
-                                                    scope='dense_transition_1', use_bn=True, bn_phaze=bn_phaze)
-
-        with tf.variable_scope('dense_block_7'):
-            for i in range(g_dense_block_layers):
-                l = layers.add_dense_layer(l, filter_dims=[3, 3, g_dense_block_depth], act_func=act_func, use_bn=False,
-                                    bn_phaze=bn_phaze, scope='layer' + str(i))
-            last_dense_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
-                                                    scope='dense_transition_1', use_bn=True, bn_phaze=bn_phaze)
+            scale_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth], act_func=act_func,
+                                                  scope='dense_transition_1', bn_phaze=bn_phaze, use_pool=False)
+            last_dense_layer = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth],
+                                                            act_func=act_func,
+                                                            scope='dense_transition_2', bn_phaze=bn_phaze, use_pool=False)
+            scale_layer = act_func(scale_layer)
+            last_dense_layer = act_func(last_dense_layer)
         '''
 
-        return last_dense_layer
+        return last_dense_layer, scale_layer
 
 
 def get_triplet_representation(img):
@@ -184,8 +258,10 @@ def load_images_from_folder(folder):
         fullname = os.path.join(folder, filename).replace("\\", "/")
         img = cv2.imread(fullname)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) # To RGB format
+
         if img is not None:
             images.append(np.array(img))
+
     return np.array(images)
 
 
@@ -234,18 +310,35 @@ def train(model_path):
         print('label:', idx, labelname)
 
         imgs_list = load_images_from_folder(os.path.join(imgs_dirname, labelname))
+        imgs_list = shuffle(imgs_list)
 
         for idx2, img in enumerate(imgs_list):
             label = np.zeros(len(os.listdir(imgs_dirname)))
             label[idx] += 1
+
             if idx2 < len(imgs_list) * 0.8:
-                trX.append(img)
                 trY.append(label)
                 trXT.append(get_triplet_representation(img))
+
+                if idx2 < len(imgs_list) * 0.7:
+                    # SpecAugment
+                    w = np.random.randint(len(img)/10)  # Max 10% width
+                    h = np.random.randint(len(img) - w + 1)
+                    img[h:h + w] = [[0, 0, 0]]
+                    img = np.transpose(img, [1, 0, 2])
+
+                    w = np.random.randint(len(img)/10)  # Max 10% width
+                    h = np.random.randint(len(img) - w + 1)
+                    img[h:h + w] = [[0, 0, 0]]
+                    img = np.transpose(img, [1, 0, 2])
+
+                    #cv2.imwrite(labelname + str(idx2) + '.jpg', img)
+
+                trX.append(img)
             else:
-                teX.append(img)
                 teY.append(label)
                 teXT.append(get_triplet_representation(img))
+                teX.append(img)
 
     trX, trY, trXT = shuffle(trX, trY, trXT)
 
@@ -259,34 +352,30 @@ def train(model_path):
     trX = trX.reshape(-1, input_height, input_width, num_channel)
     teX = teX.reshape(-1, input_height, input_width, num_channel)
 
-    X = tf.placeholder("float", [None, input_height, input_width, num_channel])
-    Y = tf.placeholder("float", [None, num_class_per_group])
-    TripletX = tf.placeholder("float", [None, representation_dim])
+    X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+    Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+    TripletX = tf.placeholder(tf.float32, [None, representation_dim])
     bn_train = tf.placeholder(tf.bool)
     keep_prob = tf.placeholder(tf.float32)
 
     # Network setup
-    cnn_representation = cnn_network(X, bn_phaze=bn_train)
+    cnn_representation, _ = cnn_network(X, bn_phaze=bn_train)
     print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
     cnn_representation = layers.global_avg_pool(cnn_representation, g_fc_layer3_dim)
     print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-    fc_representation = cnn_representation
+    #scale_representation = layers.global_avg_pool(scale_representation, representation_dim)
+    #representation = tf.add(cnn_representation, tf.multiply(TripletX, scale_representation))
 
-    #fc_representation = fc_network(cnn_representation, bn_phaze=bn_train)
+    # Residual
+    representation = tf.add(cnn_representation, TripletX)
 
-    # Concat or Transform Here
-    #representation = tf.concat([fc_representation, TripletX], 1)
-    gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim],
-                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-    gamma = tf.nn.softmax(gamma)  # Attention
-    scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
-                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-    #gamma = tf.nn.sigmoid(gamma)
-    gamma = tf.multiply(gamma, scale)
+    # L2 Softmax
+    representation = tf.nn.l2_normalize(representation, axis=1)
+    alpha = tf.log((0.9 * (num_class_per_group - 2)) / 1 - 0.9)
 
-    representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
+    representation = tf.multiply(alpha, representation)
 
     prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
 
@@ -297,15 +386,25 @@ def train(model_path):
     center_loss = get_center_loss(representation, tf.argmax(Y, 1))
     update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
     entropy_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=0.1))
+    #entropy_loss = tf.reduce_mean(tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction))
 
-    # L1 BN
-    t_val_list = [tf.reduce_sum(tf.abs(var)) for var in tf.trainable_variables() if 'gamma' in var.name]
+    # L1 BN: only for bottle neck layer's bn gamma
+    tr_val_list = [var for var in tf.trainable_variables() if 'transition' in var.name]
+    t_val_list = [tf.reduce_sum(tf.abs(var)) for var in tr_val_list if 'gamma' in var.name]
     L1_penalty = tf.reduce_sum(t_val_list)
-    scale = 0.001
+    scale = 1e-7
 
     total_loss = entropy_loss + center_loss * LAMBDA + scale * L1_penalty
+    #total_loss = entropy_loss + center_loss * LAMBDA
 
-    train_op = tf.train.AdamOptimizer(0.003).minimize(total_loss)
+    global_step = tf.Variable(0, trainable=False)
+    learning_rate = 0.05
+    decayed_lr = tf.train.exponential_decay(learning_rate,
+                                            global_step, 10000,
+                                            0.95, staircase=True)
+
+    train_op = tf.train.AdamOptimizer(decayed_lr).minimize(total_loss)
+    #train_op = tf.train.AdamOptimizer(3e-4).minimize(total_loss)
 
     predict_op = tf.argmax(tf.nn.softmax(prediction), 1)
 
@@ -328,15 +427,18 @@ def train(model_path):
             trX, trY, trXT = shuffle(trX, trY, trXT)
 
             for start, end in training_batch:
-                _, c, g, center, _ = sess.run([train_op, entropy_loss, gamma, center_loss, update_center],
-                                feed_dict={X: trX[start:end], Y: trY[start:end], TripletX: trXT[start:end], bn_train: True, keep_prob:0.5})
+                _, c, center, _, l1_penalty = sess.run(
+                    [train_op, entropy_loss, center_loss, update_center, L1_penalty],
+                    feed_dict={X: trX[start:end], Y: trY[start:end], TripletX: trXT[start:end], bn_train: True,
+                               keep_prob: 0.5})
+
                 num_itr = num_itr + 1
 
                 if num_itr % 10 == 0:
                     try:
                         print('entropy loss: ' + str(c))
                         print('center loss: ' + str(center))
-                        print('attention: ' + str(g))
+                        print('l1 penalty: ' + str(l1_penalty))
 
                         saver.save(sess, model_path)
                     except:
@@ -357,6 +459,9 @@ def train(model_path):
                              sess.run(predict_op,
                                       feed_dict={X: teX[test_indices], Y: teY[test_indices], TripletX: teXT[test_indices], bn_train: False, keep_prob:1.0}))
             print('epoch ' + str(i) + ', precision: ' + str(100 * precision) + ' %')
+
+            if precision > 0.99:
+                break
 
 
 def int_from_bytes(b3, b2, b1, b0):
@@ -398,36 +503,27 @@ def save_unknown_user(src, dirname=None, candidate=None, confidence=0.0):
 
 
 def test(model_path):
-    threshold = 0.5
+    threshold = 0.9
     print('Serving Mode, threshold: ' + str(threshold))
 
-    X = tf.placeholder("float", [None, input_height, input_width, num_channel])
-    Y = tf.placeholder("float", [None, num_class_per_group])
-    TripletX = tf.placeholder("float", [None, representation_dim])
+    X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+    Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+    TripletX = tf.placeholder(tf.float32, [None, representation_dim])
     bn_train = tf.placeholder(tf.bool)
     keep_prob = tf.placeholder(tf.float32)
 
     # Network setup
-    cnn_representation = cnn_network(X, bn_phaze=bn_train)
+    cnn_representation, _ = cnn_network(X, bn_phaze=bn_train)
     print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
     cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim)
     print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-    fc_representation = cnn_representation
+    #scale_representation = layers.global_avg_pool(scale_representation, representation_dim)
+    #representation = tf.add(cnn_representation, tf.multiply(TripletX, scale_representation))
 
-    # fc_representation = fc_network(cnn_representation, bn_phaze=bn_train)
-
-    # Concat or Transform Here
-    # representation = tf.concat([fc_representation, TripletX], 1)
-    gamma = tf.get_variable("gamma", shape=[representation_dim], initializer=tf.constant_initializer(0.0))
-    scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
-                            initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-    gamma = tf.nn.softmax(gamma)  # Attention
-    # gamma = tf.nn.sigmoid(gamma)
-    gamma = tf.multiply(gamma, scale)
-
-    representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
+    # Residual
+    representation = tf.add(cnn_representation, TripletX)
 
     prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
 
@@ -558,6 +654,7 @@ def test(model_path):
                         else:
                             #print('Run prediction..')
                             use_softmax = False
+
                             pred_id, confidence, rep = sess.run([predict_op, confidence_op, representation],
                                                                 feed_dict={X: img, TripletX: tpReps, bn_train: False,
                                                                            keep_prob: 1.0})
@@ -599,19 +696,18 @@ def test(model_path):
                                     maxI = effective_confidences.index(confidence)
                                     person = effective_labels[maxI]
 
-                                    '''
                                     if len(effective_labels) > 1:
                                         effective_confidences.sort(reverse=True)
 
-                                        if effective_confidences[0] - effective_confidences[1] < 0.25:
+                                        if effective_confidences[0] - effective_confidences[1] < 0.5:
                                             person = 'Unknown'
                                             confidence = 0.99
-                                    '''
+
                                 print('\nPerson: ' + person + ', Confidence: ' + str(confidence * 100) + '%')
 
-                                if confidence < 0.8:
+                                if confidence < 0.9:
                                     save_unknown_user(fileName, dirname, 'Unknown', confidence)
-                                else:
+                                elif confidence >= 0.9 and confidence < 0.97:
                                     save_unknown_user(fileName, dirname, person, confidence)
 
                                 if confidence < threshold:
@@ -659,7 +755,6 @@ if __name__ == '__main__':
         num_class_per_group = len(os.listdir(imgs_dirname))
         train(model_path)
     elif mode == 'test':
-        num_class_per_group = len(os.listdir(label_directory))
         HOST = args.camera_host
         PORT = args.camera_port
         REDIS_SERVER = args.redis_host
@@ -676,18 +771,16 @@ if __name__ == '__main__':
 
         data_dir = args.data
 
-        num_class_per_group = len(os.listdir(label_directory))
-
         if not os.path.exists(data_dir):
             print('No data.')
         else:
-            X = tf.placeholder("float", [None, input_height, input_width, num_channel])
-            TripletX = tf.placeholder("float", [None, representation_dim])
+            X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+            TripletX = tf.placeholder(tf.float32, [None, representation_dim])
             bn_train = tf.placeholder(tf.bool)
             keep_prob = tf.placeholder(tf.float32)
 
             # Network setup
-            cnn_representation = cnn_network(X, bn_phaze=bn_train)
+            cnn_representation, _ = cnn_network(X, bn_phaze=bn_train)
             print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
             cnn_representation = layers.global_avg_pool(cnn_representation, g_fc_layer3_dim)
@@ -695,18 +788,11 @@ if __name__ == '__main__':
 
             fc_representation = cnn_representation
 
-            # fc_representation = fc_network(cnn_representation, bn_phaze=bn_train)
+            #scale_representation = layers.global_avg_pool(scale_representation, representation_dim)
+            #representation = tf.add(cnn_representation, tf.multiply(TripletX, scale_representation))
 
-            # Concat or Transform Here
-            # representation = tf.concat([fc_representation, TripletX], 1)
-            gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim], initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-            scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
-                                    initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-            gamma = tf.nn.softmax(gamma)  # Attention
-            # gamma = tf.nn.sigmoid(gamma)
-            gamma = tf.multiply(gamma, scale)
-
-            representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
+            # Residual
+            representation = tf.add(cnn_representation, TripletX)
 
             prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
 
@@ -756,34 +842,24 @@ if __name__ == '__main__':
 
         num_class_per_group = len(label_list)
 
-        X = tf.placeholder("float", [None, input_height, input_width, num_channel])
-        Y = tf.placeholder("float", [None, num_class_per_group])
-        TripletX = tf.placeholder("float", [None, representation_dim])
+        X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+        Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+        TripletX = tf.placeholder(tf.float32, [None, representation_dim])
         bn_train = tf.placeholder(tf.bool)
         keep_prob = tf.placeholder(tf.float32)
 
         # Network setup
-        cnn_representation = cnn_network(X, bn_phaze=bn_train)
+        cnn_representation, _ = cnn_network(X, bn_phaze=bn_train)
         print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
         cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim)
         print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-        fc_representation = cnn_representation
+        #scale_representation = layers.global_avg_pool(scale_representation, representation_dim)
+        #representation = tf.add(cnn_representation, tf.multiply(TripletX, scale_representation))
 
-        # fc_representation = fc_network(cnn_representation, bn_phaze=bn_train)
-
-        # Concat or Transform Here
-        # representation = tf.concat([fc_representation, TripletX], 1)
-        gamma = tf.get_variable("gamma", shape=[g_fc_layer3_dim],
-                                initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-        scale = tf.get_variable("scale", shape=[g_fc_layer3_dim],
-                                initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
-        gamma = tf.nn.softmax(gamma)  # Attention
-        # gamma = tf.nn.sigmoid(gamma)
-        gamma = tf.multiply(gamma, scale)
-
-        representation = tf.add(fc_representation, tf.multiply(gamma, TripletX))
+        # Residual
+        representation = tf.add(cnn_representation, TripletX)
 
         prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
 
@@ -817,7 +893,6 @@ if __name__ == '__main__':
             for idx, labelname in enumerate(os.listdir(test_data_dir)):
                 print('label:' + labelname)
 
-                #imgs_list = load_images_from_folder(os.path.join(test_data_dir, labelname))
                 label_dir = os.path.join(test_data_dir, labelname).replace("\\", "/")
                 img_files = os.listdir(label_dir)
 
@@ -826,3 +901,6 @@ if __name__ == '__main__':
 
                     pred_id, confidence = sess.run([predict_op, confidence_op], feed_dict={X: img, TripletX: trep, bn_train: False, keep_prob: 1.0})
                     print(labelname + ', predict: ' + label_list[pred_id[0]] + ', ' + str(confidence[0][pred_id[0]]))
+
+
+
