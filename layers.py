@@ -124,7 +124,7 @@ def batch_norm(x, b_train, scope, reuse=False):
 
 
 def conv(input, scope, filter_dims, stride_dims, padding='SAME',
-         non_linear_fn=tf.nn.relu, bias=True):
+         non_linear_fn=tf.nn.relu, dilation=[1, 1, 1, 1], bias=True):
     input_dims = input.get_shape().as_list()
 
     assert (len(input_dims) == 4)  # batch_size, height, width, num_channels_in
@@ -139,7 +139,7 @@ def conv(input, scope, filter_dims, stride_dims, padding='SAME',
         conv_weight = tf.Variable(
             tf.truncated_normal([filter_h, filter_w, num_channels_in, num_channels_out], stddev=0.1, dtype=tf.float32))
         conv_bias = tf.Variable(tf.zeros([num_channels_out], dtype=tf.float32))
-        map = tf.nn.conv2d(input, conv_weight, strides=[1, stride_h, stride_w, 1], padding=padding)
+        map = tf.nn.conv2d(input, conv_weight, strides=[1, stride_h, stride_w, 1], padding=padding, dilations=dilation)
 
         if bias is True:
             map = tf.nn.bias_add(map, conv_bias)
@@ -176,7 +176,7 @@ def batch_norm_conv(x, b_train, scope):
         return normed
 
 
-def add_dense_layer(layer, filter_dims, act_func=tf.nn.relu, scope='dense_layer', use_bn=True, bn_phaze=False):
+def add_dense_layer(layer, filter_dims, act_func=tf.nn.relu, scope='dense_layer', use_bn=True, bn_phaze=False, use_bias=False):
     with tf.variable_scope(scope):
         l = layer
 
@@ -184,22 +184,37 @@ def add_dense_layer(layer, filter_dims, act_func=tf.nn.relu, scope='dense_layer'
             l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
 
         l = act_func(l)
-        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=False)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
         l = tf.concat([l, layer], 3)
 
     return l
 
 
-def add_dense_transition_layer(layer, filter_dims, act_func=tf.nn.relu, scope='transition', use_bn=True, bn_phaze=False):
+def add_residual_layer(layer, filter_dims, act_func=tf.nn.relu, scope='residual_layer', use_bn=True, bn_phaze=False, use_bias=False):
+    with tf.variable_scope(scope):
+        l = layer
+
+        if use_bn:
+            l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
+
+        l = act_func(l)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
+
+    return l
+
+
+def add_dense_transition_layer(layer, filter_dims, act_func=tf.nn.relu, scope='transition', use_bn=True, bn_phaze=False, use_pool=True, use_bias=False):
     with tf.variable_scope(scope):
         l = act_func(layer)
-        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=False)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
 
         if use_bn:
             l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
 
         #def max_pool(value, ksize, strides, padding, data_format="NHWC", name=None):
-        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        if use_pool:
+            l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
     return l
 
 
@@ -220,9 +235,12 @@ def global_avg_pool(input_data, output_length=1, padding='VALID', scope='gloval_
 
             return pool
         else:
-            conv_weight = tf.Variable(tf.truncated_normal([1, 1, num_channels_in, output_length], stddev=0.1, dtype=tf.float32))
-            conv = tf.nn.conv2d(input_data, conv_weight, strides=[1, 1, 1, 1], padding='SAME')
-            pool = tf.nn.avg_pool(conv, ksize=[1, height, width, 1], strides=[1, 1, 1, 1], padding=padding)
+            if num_channels_in != output_length:
+                conv_weight = tf.Variable(tf.truncated_normal([1, 1, num_channels_in, output_length], stddev=0.1, dtype=tf.float32))
+                conv = tf.nn.conv2d(input_data, conv_weight, strides=[1, 1, 1, 1], padding='SAME')
+                pool = tf.nn.avg_pool(conv, ksize=[1, height, width, 1], strides=[1, 1, 1, 1], padding=padding)
+            else:
+                pool = tf.nn.avg_pool(input_data, ksize=[1, height, width, 1], strides=[1, 1, 1, 1], padding=padding)
             pool = tf.squeeze(pool, axis=[1, 2])
 
             return pool
