@@ -664,7 +664,7 @@ def train(model_path):
     center_loss, center_distance_loss = get_center_loss(representation, tf.argmax(Y, 1))
     update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
 
-    prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
+    prediction = layers.fc(representation, num_class_per_group, scope='classifier')
 
     with tf.device('/device:GPU:1'):
         #noise = tf.random_normal(shape=tf.shape(representation), mean=0.0, stddev=1.0, dtype=tf.float32)
@@ -703,7 +703,7 @@ def train(model_path):
     class_loss = entropy_loss + center_loss * LAMBDA
 
     # training operation
-    c_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(class_loss, var_list=class_vars)
+    c_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(class_loss)
     d_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(discriminator_loss, var_list=d_vars)
     g_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(residual_loss, var_list=generator_vars)
     gan_g_optimzier = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(gan_g_loss, var_list=generator_vars)
