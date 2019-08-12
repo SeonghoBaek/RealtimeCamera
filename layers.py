@@ -184,7 +184,8 @@ def add_dense_layer(layer, filter_dims, act_func=tf.nn.relu, scope='dense_layer'
             l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
 
         l = act_func(l)
-        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], dilation=[1, 2, 2, 1],
+                 non_linear_fn=None, bias=use_bias)
         l = tf.concat([l, layer], 3)
 
     return l
@@ -198,20 +199,20 @@ def add_residual_layer(layer, filter_dims, act_func=tf.nn.relu, scope='residual_
             l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
 
         l = act_func(l)
-        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], dilation=[1, 2, 2, 1], non_linear_fn=act_func, bias=use_bias)
 
     return l
 
 
-def add_dense_transition_layer(layer, filter_dims, act_func=tf.nn.relu, scope='transition', use_bn=True, bn_phaze=False, use_pool=True, use_bias=False):
+def add_dense_transition_layer(layer, filter_dims, stride_dims=[1, 1], act_func=tf.nn.relu, scope='transition',
+                               use_bn=True, bn_phaze=False, use_pool=True, use_bias=False):
     with tf.variable_scope(scope):
-        l = act_func(layer)
-        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=[1, 1], non_linear_fn=None, bias=use_bias)
-
         if use_bn:
-            l = batch_norm_conv(l, b_train=bn_phaze, scope='bn')
+            l = batch_norm_conv(layer, b_train=bn_phaze, scope='bn')
 
-        #def max_pool(value, ksize, strides, padding, data_format="NHWC", name=None):
+        l = act_func(l)
+        l = conv(l, scope='conv', filter_dims=filter_dims, stride_dims=stride_dims, non_linear_fn=None, bias=use_bias)
+
         if use_pool:
             l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
@@ -258,3 +259,105 @@ def avg_pool(input, scope, filter_dims, stride_dims, padding='SAME'):
                               padding=padding)
 
         return pool
+
+
+def get_deconv2d_output_dims(input_dims, filter_dims, stride_dims, padding):
+    batch_size, input_h, input_w, num_channels_in = input_dims
+    filter_h, filter_w, num_channels_out = filter_dims
+    stride_h, stride_w = stride_dims
+
+    if padding == 'SAME':
+        out_h = input_h * stride_h
+    elif padding == 'VALID':
+        out_h = (input_h - 1) * stride_h + filter_h
+
+    if padding == 'SAME':
+        out_w = input_w * stride_w
+    elif padding == 'VALID':
+        out_w = (input_w - 1) * stride_w + filter_w
+
+    return [batch_size, out_h, out_w, num_channels_out]
+
+
+def deconv(input_data, b_size, scope, filter_dims, stride_dims, padding='SAME', non_linear_fn=tf.nn.relu):
+    input_dims = input_data.get_shape().as_list()
+    # print(scope, 'in', input_dims)
+    assert (len(input_dims) == 4)  # batch_size, height, width, num_channels_in
+    assert (len(filter_dims) == 3)  # height, width and num_channels out
+    assert (len(stride_dims) == 2)  # stride height and width
+
+    input_dims = [b_size, input_dims[1], input_dims[2], input_dims[3]]
+    num_channels_in = input_dims[-1]
+    filter_h, filter_w, num_channels_out = filter_dims
+    stride_h, stride_w = stride_dims
+
+    output_dims = get_deconv2d_output_dims(input_dims,
+                                           filter_dims,
+                                           stride_dims,
+                                           padding)
+
+    with tf.variable_scope(scope):
+        deconv_weight = tf.Variable(
+            tf.random_normal([filter_h, filter_w, num_channels_out, num_channels_in], stddev=0.1, dtype=tf.float32))
+
+        deconv_bias = tf.Variable(tf.zeros([num_channels_out], dtype=tf.float32))
+
+        map = tf.nn.conv2d_transpose(input_data, deconv_weight, output_dims, strides=[1, stride_h, stride_w, 1],
+                                     padding=padding)
+
+        map = tf.nn.bias_add(map, deconv_bias)
+
+        activation = non_linear_fn(map)
+
+        # print(scope, 'out', activation.get_shape().as_list())
+        return activation
+
+
+def self_attention(x, channels, act_func=tf.nn.relu, scope='attention'):
+    with tf.variable_scope(scope):
+        batch_size, height, width, num_channels = x.get_shape().as_list()
+
+        f = conv(x, scope='f_conv', filter_dims=[1, 1, channels//8], stride_dims=[1, 1], non_linear_fn=act_func)
+        f = tf.layers.max_pooling2d(f, pool_size=2, strides=2, padding='SAME')
+
+        print('attention f dims: ' + str(f.get_shape().as_list()))
+
+        g = conv(x, scope='g_conv', filter_dims=[1,  1, channels//8], stride_dims=[1, 1], non_linear_fn=act_func)
+
+        print('attention g dims: ' + str(g.get_shape().as_list()))
+
+        h = conv(x, scope='h_conv', filter_dims=[1, 1, channels//2], stride_dims=[1, 1], non_linear_fn=act_func)
+        h = tf.layers.max_pooling2d(h, pool_size=2, strides=2, padding='SAME')
+
+        print('attention h dims: ' + str(h.get_shape().as_list()))
+
+        # N = h * w
+        g = tf.reshape(g, shape=[g.shape[0], -1, g.shape[-1]])
+
+        print('attention g flat dims: ' + str(g.get_shape().as_list()))
+
+        f = tf.reshape(f, shape=[f.shape[0], -1, f.shape[-1]])
+
+        print('attention f flat dims: ' + str(f.get_shape().as_list()))
+
+        s = tf.matmul(g, f, transpose_b=True)  # # [bs, N, N]
+
+        beta = tf.nn.softmax(s)  # attention map
+
+        print('attention beta dims: ' + str(s.get_shape().as_list()))
+
+        h = tf.reshape(h, shape=[h.shape[0], -1, h.shape[-1]])
+
+        print('attention h flat dims: ' + str(h.get_shape().as_list()))
+
+        o = tf.matmul(beta, h)  # [bs, N, C]
+
+        print('attention o dims: ' + str(o.get_shape().as_list()))
+
+        gamma = tf.get_variable("gamma", [1], initializer=tf.constant_initializer(0.0))
+
+        o = tf.reshape(o, shape=[batch_size, height, width, num_channels // 2])  # [bs, h, w, C]
+        o = conv(o, scope='attn_conv', filter_dims=[1, 1, channels], stride_dims=[1, 1], non_linear_fn=act_func)
+        x = gamma * o + x
+
+    return x
