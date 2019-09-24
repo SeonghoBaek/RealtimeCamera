@@ -5,7 +5,6 @@ import cv2
 from sklearn.utils import shuffle
 import util
 import layers
-import openface
 import redis
 import socket
 import array
@@ -16,11 +15,12 @@ import argparse
 import csv
 import pickle
 import shutil
+import alignment
 
-LAMBDA = 1e-4
+LAMBDA = 1e-2
 GAMMA = 1.0
 
-CENTER_LOSS_ALPHA = 0.5
+CENTER_LOSS_ALPHA = 1.0
 DISTANCE_MARGIN = 10.0
 
 representation_dim = 256
@@ -32,7 +32,7 @@ num_patch = 4
 batch_size = 16
 test_size = 100
 num_class_per_group = 70
-num_epoch = 100
+num_epoch = 30
 
 # Network Parameters
 g_fc_layer1_dim = 1024
@@ -48,22 +48,19 @@ lstm_sequence_length = 96
 lstm_representation_dim = 64
 
 dlibDetector = dlib.get_frontal_face_detector()
-align = openface.AlignDlib('openface/models/dlib/shape_predictor_68_face_landmarks.dat')
-
-X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
-Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+align = alignment.AlignDlib('dlib/shape_predictor_68_face_landmarks.dat')
 
 with tf.device('/device:CPU:0'):
     ANCHOR = tf.placeholder(tf.float32, [None, 48, 48, 128])
 
-LSTM_X = tf.placeholder(dtype=tf.float32, shape=[None, lstm_sequence_length, lstm_sequence_length])
+#LSTM_X = tf.placeholder(dtype=tf.float32, shape=[None, lstm_sequence_length, lstm_sequence_length])
 bn_train = tf.placeholder(tf.bool)
 keep_prob = tf.placeholder(tf.float32)
 
 
 def get_center_loss(features, labels):
     with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
-        centers = tf.get_variable('centers')
+        centers = tf.get_variable('centers', initializer=tf.random_normal_initializer)
 
     len_features = features.get_shape()[1]
 
@@ -72,18 +69,24 @@ def get_center_loss(features, labels):
 
     loss = tf.reduce_mean(tf.reduce_sum((features - centers_batch) ** 2, [1]))
 
+    unique_labels, _ = tf.unique(labels)
+    reverse_labels = tf.reverse(unique_labels, [0])
+
     # Center distance loss
-    shuffle_labels = tf.random.shuffle(labels)
-    shuffle_centers = tf.gather(centers, shuffle_labels)
+    unique_centers = tf.gather(centers, unique_labels)
+    shuffle_centers = tf.gather(centers, reverse_labels)
 
-    distance_loss = DISTANCE_MARGIN / tf.reduce_mean(tf.reduce_sum((centers_batch - shuffle_centers) ** 2, [1]))
+    distance = tf.reduce_mean(tf.reduce_sum((unique_centers - shuffle_centers) ** 2, [1]))
 
-    return loss, distance_loss
+    distance_loss = DISTANCE_MARGIN / (1 + distance)
+    #distance_loss = DISTANCE_MARGIN * (1.0 - tf.sigmoid(distance))
+
+    return loss * distance_loss, distance_loss
 
 
 def update_centers(features, labels, alpha):
     with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
-        centers = tf.get_variable('centers')
+        centers = tf.get_variable('centers', initializer=tf.random_normal_initializer)
 
     labels = tf.reshape(labels, [-1])  # flatten
     centers_batch = tf.gather(centers, labels)  # Gather center tensor by labels value order
@@ -367,8 +370,8 @@ def encoder_network(x, activation='relu', scope='encoder_network', reuse=False, 
         l = act_func(l)
 
         # [48 x 48]
-        #l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        #l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         l = add_residual_dense_block(l, filter_dims=[3, 3, g_dense_block_depth], num_layers=2,
                                      act_func=act_func, bn_phaze=bn_phaze, scope='block_2')
@@ -389,8 +392,8 @@ def encoder_network(x, activation='relu', scope='encoder_network', reuse=False, 
         l_share = l
 
         # [24 x 24]
-        #l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        #l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth*2],
                                           act_func=act_func,
@@ -410,8 +413,8 @@ def encoder_network(x, activation='relu', scope='encoder_network', reuse=False, 
         l = act_func(l)
 
         # [12 x 12]
-        #l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        #l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth * 3],
                                               act_func=act_func,
@@ -431,8 +434,8 @@ def encoder_network(x, activation='relu', scope='encoder_network', reuse=False, 
         l = act_func(l)
 
         # [6 x 6]
-        #l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-        l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        l = tf.nn.avg_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        #l = tf.nn.max_pool(l, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
         l = layers.add_dense_transition_layer(l, filter_dims=[1, 1, g_dense_block_depth * 4],
                                               act_func=act_func,
@@ -463,18 +466,6 @@ def encoder_network(x, activation='relu', scope='encoder_network', reuse=False, 
     return last_dense_layer, scale_layer, l_share
 
 
-'''
-def get_triplet_representation(img, to_rgb=False):
-    if to_rgb is True:
-        bgrImg = img
-        rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
-    else:
-        rgbImg = img
-
-    return triplet.forward(rgbImg)
-'''
-
-
 def load_images_patch(filename, b_align=False):
     images = []
     lstm_images = []
@@ -499,11 +490,6 @@ def load_images_patch(filename, b_align=False):
         img = cv2.resize(img, dsize=(scale_size, scale_size))
         grey_img = cv2.resize(grey_img, dsize=(scale_size, scale_size))
 
-        # croped = img[scale_size / 2 - input_width / 2:scale_size / 2 + input_width / 2,
-        #         scale_size / 2 - input_width / 2:scale_size / 2 + input_width / 2].copy()
-
-        # images.append(croped)
-
         dy = np.random.random_integers(low=1, high=img.shape[0] - input_height, size=num_patch - 1)
         dx = np.random.random_integers(low=1, high=img.shape[1] - input_width, size=num_patch - 1)
 
@@ -516,7 +502,7 @@ def load_images_patch(filename, b_align=False):
 
             croped_grey = grey_img[window[i][0]:window[i][0] + input_height,
                           window[i][1]:window[i][1] + input_width].copy()
-            # lstm_image = cv2.resize(croped_grey, dsize=(lstm_sequence_length, lstm_sequence_length))
+            lstm_image = croped_grey / 255.0
             lstm_images.append(lstm_image)
 
     images = np.array(images)
@@ -560,10 +546,6 @@ def load_images_from_folder(folder, use_augmentation=False):
                 img = cv2.resize(img, dsize=(scale_size, scale_size), interpolation=cv2.INTER_CUBIC)
                 grey_img = cv2.resize(grey_img, dsize=(scale_size, scale_size), interpolation=cv2.INTER_CUBIC)
 
-                # croped = img[scale_size/2 - input_width/2:scale_size/2 + input_width/2, scale_size/2 - input_width/2:scale_size/2 + input_width/2].copy()
-
-                # images.append(croped)
-
                 dy = np.random.random_integers(low=1, high=img.shape[0] - input_height, size=num_patch - 1)
                 dx = np.random.random_integers(low=1, high=img.shape[1] - input_width, size=num_patch - 1)
 
@@ -581,7 +563,7 @@ def load_images_from_folder(folder, use_augmentation=False):
 
                     croped_grey = grey_img[window[i][0]:window[i][0] + input_height,
                                   window[i][1]:window[i][1] + input_width].copy()
-                    # lstm_image = cv2.resize(croped_grey, dsize=(lstm_sequence_length, lstm_sequence_length))
+
                     lstm_image = croped_grey / 255.0
                     lstm_images.append(lstm_image)
 
@@ -603,32 +585,9 @@ def get_align_image(img_file_path):
         # print('No bbox')
         return [], []
 
-    alignedFace = align.align(input_width, rgbImg, bbs[0], landmarkIndices=[8, 36, 45], skipMulti=True)
-
-    # alignedFace = np.array(alignedFace).reshape(-1, input_width, input_height, num_channel)
+    alignedFace = align.align(input_width, rgbImg, bbs[0], landmarkIndices=alignment.AlignDlib.INNER_EYES_AND_NOSE, skipMulti=True)
 
     return alignedFace  # RGB format
-
-
-'''
-def get_triplet_representation_align_image(img_file_path):
-    bgrImg = cv2.imread(img_file_path)
-    rgbImg = cv2.cvtColor(bgrImg, cv2.COLOR_BGR2RGB)
-
-    #print('Dlib bbox detect')
-    bbs = dlibDetector(rgbImg, 1)
-
-    if len(bbs) == 0:
-        #print('No bbox')
-        return [], []
-
-    alignedFace = align.align(input_width, rgbImg, bbs[0], landmarkIndices=[8, 36, 45], skipMulti=True)
-
-    rep = triplet.forward(alignedFace)
-    #alignedFace = np.array(alignedFace).reshape(-1, input_width, input_height, num_channel)
-
-    return [rep], alignedFace # RGB format
-'''
 
 
 def get_feature_matching_loss(value, target, type='l1', gamma=1.0):
@@ -691,11 +650,9 @@ def make_multi_modal_noise(input, num_mode=8):
 def train(model_path):
     trX = []
     trY = []
-    trXS = []
 
     teX = []
     teY = []
-    teXS = []
 
     dir_list = os.listdir(imgs_dirname)
     dir_list.sort(key=str.lower)
@@ -703,10 +660,12 @@ def train(model_path):
     one_hot_length = len(os.listdir(imgs_dirname))
 
     with tf.device('/device:CPU:0'):
+        X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+        Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+
         for idx, labelname in enumerate(dir_list):
-            imgs_list, lstm_imgs_list = load_images_from_folder(os.path.join(imgs_dirname, labelname),
-                                                                use_augmentation=True)
-            imgs_list, lstm_imgs_list = shuffle(imgs_list, lstm_imgs_list)
+            imgs_list, _ = load_images_from_folder(os.path.join(imgs_dirname, labelname), use_augmentation=True)
+            imgs_list = shuffle(imgs_list)
 
             label = np.zeros(one_hot_length)
             label[idx] += 1
@@ -734,26 +693,20 @@ def train(model_path):
                         #cv2.imwrite(labelname + str(idx2) + '.jpg', img)
                     '''
                     trX.append(img)
-                    trXS.append(lstm_imgs_list[idx2])
                 else:
-                    if np.argmax(label) != 67:
+                    if labelname != 'Unknown':
                         teY.append(label)
                         teX.append(img)
-                        teXS.append(lstm_imgs_list[idx2])
 
-        trX, trY, trXS = shuffle(trX, trY, trXS)
+        trX, trY = shuffle(trX, trY)
 
         trX = np.array(trX)
         trY = np.array(trY)
-        trXS = np.array(trXS)
         teX = np.array(teX)
         teY = np.array(teY)
-        teXS = np.array(teXS)
 
         trX = trX.reshape(-1, input_height, input_width, num_channel)
         teX = teX.reshape(-1, input_height, input_width, num_channel)
-        trXS = trXS.reshape(-1, lstm_sequence_length, lstm_sequence_length)
-        teXS = teXS.reshape(-1, lstm_sequence_length, lstm_sequence_length)
 
     print('Number of Classes: ' + str(num_class_per_group))
     # Network setup
@@ -763,18 +716,12 @@ def train(model_path):
     cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim, scope='encoder')
     print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-    lstm_representation = lstm_network(LSTM_X, scope='lstm', forget_bias=1.0, keep_prob=keep_prob)
-
-    #representation = tf.concat([cnn_representation, lstm_representation], axis=1)
     representation = cnn_representation
 
     with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
-        #centers = tf.get_variable('centers', [num_class_per_group, representation_dim + lstm_representation_dim],
-        #                          dtype=tf.float32,
-        #                          initializer=tf.constant_initializer(0), trainable=False)
         centers = tf.get_variable('centers', [num_class_per_group, representation_dim],
                                   dtype=tf.float32,
-                                  initializer=tf.constant_initializer(0), trainable=False)
+                                  initializer=tf.random_normal_initializer, trainable=False)
 
     smoothing_factor = 0.1
     prob_threshold = 1 - smoothing_factor
@@ -785,20 +732,22 @@ def train(model_path):
 
     # representation = tf.multiply(alpha, representation)
 
+    # [Batch, representation_dim]
+    # representation = tf.nn.l2_normalize(representation, axis=1)
+
     center_loss, center_distance_loss = get_center_loss(representation, tf.argmax(Y, 1))
     update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
 
-    prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
+    prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final_2')
 
-    entropy_loss = tf.reduce_mean(
-        tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=smoothing_factor))
+    if smoothing_factor > 0:
+        entropy_loss = tf.reduce_mean(
+            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=smoothing_factor))
+    else:
+        entropy_loss = tf.reduce_mean(
+            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction))
 
-    #entropy_loss = tf.reduce_mean(
-    #    tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction))
-
-    #class_loss = entropy_loss + center_loss * LAMBDA
-    center_full_loss = CENTER_LOSS_ALPHA * center_loss + center_distance_loss
-    class_loss = entropy_loss + center_full_loss * LAMBDA
+    class_loss = entropy_loss + center_loss * LAMBDA
 
     # training operation
     c_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(class_loss)
@@ -821,13 +770,13 @@ def train(model_path):
                              range(batch_size, len(trX) + 1, batch_size))
 
         for i in range(num_epoch):
-            trX, trY, trXS = shuffle(trX, trY, trXS)
+            trX, trY = shuffle(trX, trY)
 
             for start, end in training_batch:
 
-                _, c, center, _ = sess.run(
-                    [c_optimizer, entropy_loss, center_loss, update_center],
-                    feed_dict={X: trX[start:end], Y: trY[start:end], LSTM_X: trXS[start:end], bn_train: True,
+                _, c, center, cd, _ = sess.run(
+                    [c_optimizer, entropy_loss, center_loss, center_distance_loss, update_center],
+                    feed_dict={X: trX[start:end], Y: trY[start:end], bn_train: True,
                                keep_prob: 0.5})
 
                 num_itr = num_itr + 1
@@ -836,6 +785,7 @@ def train(model_path):
                     print('itr #' + str(num_itr))
                     print('  - entropy loss: ' + str(c))
                     print('  - center loss: ' + str(center))
+                    print('  - distance loss: ' + str(cd))
 
             try:
                 saver.save(sess, model_path)
@@ -852,16 +802,13 @@ def train(model_path):
             print('# Prediction #')
             print(sess.run(predict_op,
                            feed_dict={X: teX[test_indices], Y: teY[test_indices],
-                                      LSTM_X: teXS[test_indices], bn_train: False, keep_prob: 1.0}))
+                                      bn_train: False, keep_prob: 1.0}))
 
             precision = np.mean(np.argmax(teY[test_indices], axis=1) ==
                                 sess.run(predict_op,
                                          feed_dict={X: teX[test_indices], Y: teY[test_indices],
-                                                    LSTM_X: teXS[test_indices], bn_train: False, keep_prob: 1.0}))
+                                                    bn_train: False, keep_prob: 1.0}))
             print('epoch ' + str(i) + ', precision: ' + str(100 * precision) + ' %')
-
-            # if precision > 0.99:
-            #    break
 
 
 def int_from_bytes(b3, b2, b1, b0):
@@ -917,9 +864,13 @@ def findEuclideanDistance(source_representation, test_representation):
 
 
 def test(model_path):
-    threshold = 0.8
+    threshold = 0.9
     print('Serving Mode, threshold: ' + str(threshold))
 
+    X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+    Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+
+    print('Number of Classes: ' + str(num_class_per_group))
     # Network setup
     cnn_representation, _, anchor_layer = encoder_network(X, bn_phaze=bn_train, activation='relu', scope='encoder')
     print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
@@ -927,18 +878,12 @@ def test(model_path):
     cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim, scope='encoder')
     print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-    lstm_representation = lstm_network(LSTM_X, scope='lstm', forget_bias=1.0, keep_prob=keep_prob)
-
-    # representation = tf.concat([cnn_representation, lstm_representation], axis=1)
     representation = cnn_representation
 
     with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
-        # centers = tf.get_variable('centers', [num_class_per_group, representation_dim + lstm_representation_dim],
-        #                          dtype=tf.float32,
-        #                          initializer=tf.constant_initializer(0), trainable=False)
         centers = tf.get_variable('centers', [num_class_per_group, representation_dim],
                                   dtype=tf.float32,
-                                  initializer=tf.constant_initializer(0), trainable=False)
+                                  initializer=tf.random_normal_initializer, trainable=False)
 
     smoothing_factor = 0.1
     prob_threshold = 1 - smoothing_factor
@@ -949,18 +894,24 @@ def test(model_path):
 
     # representation = tf.multiply(alpha, representation)
 
+    # [Batch, representation_dim]
+    #representation = tf.nn.l2_normalize(representation, axis=1)
+
     center_loss, center_distance_loss = get_center_loss(representation, tf.argmax(Y, 1))
     update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
 
-    prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
+    prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final_2')
 
-    # entropy_loss = tf.reduce_mean(
-    #    tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=smoothing_factor))
+    if smoothing_factor > 0:
+        entropy_loss = tf.reduce_mean(
+            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=smoothing_factor))
+    else:
+        entropy_loss = tf.reduce_mean(
+            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction))
 
-    entropy_loss = tf.reduce_mean(
-        tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction))
-
-    class_loss = entropy_loss + center_loss * LAMBDA
+    # class_loss = entropy_loss + center_loss * LAMBDA
+    center_full_loss = CENTER_LOSS_ALPHA * center_loss + center_distance_loss
+    class_loss = entropy_loss + center_full_loss * LAMBDA
 
     # training operation
     c_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(class_loss)
@@ -979,9 +930,7 @@ def test(model_path):
             print('Model load failed: ' + model_path)
             return
 
-        fileDir = os.path.dirname(os.path.realpath(__file__))
         # Modify baseDir to your environment
-        inputDir = fileDir + '/svm'
         label_list = [d for d in os.listdir(label_directory) if os.path.isdir(label_directory + '/' + d)]
         label_list.sort(key=str.lower)
 
@@ -991,10 +940,6 @@ def test(model_path):
         group_label_list.sort(key=str.lower)
 
         redis_ready = False
-
-        clf_directory = os.path.dirname(os.path.realpath(__file__)) + '/svm/classifier/'
-        clf_files = os.listdir(clf_directory)
-        clf_list = [pickle.load(open(clf_directory + pkl_file, 'r')) for pkl_file in clf_files]
 
         try:
             rds = redis.StrictRedis(host=REDIS_SERVER, port=REDIS_PORT, db=0)
@@ -1028,10 +973,7 @@ def test(model_path):
         cur_target_frame = -1
         next_target_frame = 1
 
-        if not os.path.exists(inputDir + '/../Unknown'):
-            os.mkdir(inputDir + '/../Unknown')
-
-        dirname = inputDir + '/../Unknown'
+        dirname = './Unknown'
 
         if not os.path.exists(dirname):
             os.mkdir(dirname)
@@ -1076,71 +1018,21 @@ def test(model_path):
                         if len(img[0]) == 0:
                             print('Not a valid face.')
                         else:
-                            grey_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                            # grey_img = cv2.resize(grey_img, dsize=(lstm_sequence_length, lstm_sequence_length))
-                            # grey_img = np.array(grey_img).reshape(-1, lstm_sequence_length, lstm_sequence_length)
-
-                            # print('Run prediction..')
-                            use_softmax = True
-
                             img = img / 255.0
-                            grey_img = grey_img / 255.0
 
                             pred_id, confidence, rep = sess.run([predict_op, confidence_op, representation],
-                                                                feed_dict={X: [img], LSTM_X: [grey_img], bn_train: False,
-                                                                           keep_prob: 1.0})
+                                                                feed_dict={X: [img], bn_train: False, keep_prob: 1.0})
 
-                            if use_softmax is True:
-                                # print('# Prediction: ' + str(pred_id))
-                                person = group_label_list[pred_id[0]]
-                                confidence = confidence[0][pred_id[0]]
-                                print('# Person: ' + person + ', Confidence: ' + str(confidence))
-                            else:
-                                confidences = []
-                                labels = []
+                            # print('# Prediction: ' + str(pred_id))
+                            person = group_label_list[pred_id[0]]
+                            confidence = confidence[0][pred_id[0]]
 
-                                for (le, clf) in clf_list:
-                                    pred = clf.predict_proba(rep).ravel()
-                                    maxI = np.argmax(pred)
-                                    person = le.inverse_transform([maxI])
-                                    confidence = pred[maxI]
-                                    confidences.append(confidence)
-                                    labels.append(person[0])
-
-                                print('#################################')
-                                print(labels)
-                                print(confidences)
-
-                                effective_labels = []
-                                effective_confidences = []
-
-                                for i in range(len(labels)):
-                                    if labels[i] != 'Unknown':
-                                        effective_labels.append(labels[i])
-                                        effective_confidences.append(confidences[i])
-
-                                if len(effective_labels) == 0:
-                                    person = 'Unknown'
-                                    confidence = 0.99
-                                else:
-                                    confidence = max(effective_confidences)
-                                    maxI = effective_confidences.index(confidence)
-                                    person = effective_labels[maxI]
-
-                                    if len(effective_labels) > 1:
-                                        effective_confidences.sort(reverse=True)
-
-                                        if effective_confidences[0] - effective_confidences[1] < 0.5:
-                                            person = 'Unknown'
-                                            confidence = 0.99
-
-                                print('\nPerson: ' + person + ', Confidence: ' + str(confidence * 100) + '%')
+                            print('# Person: ' + person + ', Confidence: ' + str(confidence))
 
                             if confidence < threshold:
                                 save_unknown_user(fileName, dirname, 'Unknown', confidence)
                             elif confidence >= threshold:
                                 save_unknown_user(fileName, dirname, person, confidence)
-                                confidence = 0.91
 
                             if confidence < threshold:
                                 person = 'Unknown'
@@ -1185,6 +1077,7 @@ if __name__ == '__main__':
 
     if mode == 'train':
         num_class_per_group = len(os.listdir(imgs_dirname))
+        print('Num classes: ' + str(num_class_per_group))
         train(model_path)
     elif mode == 'test':
         HOST = args.camera_host
@@ -1193,6 +1086,8 @@ if __name__ == '__main__':
         REDIS_PORT = args.redis_port
         redis_channel = args.redis_camera_channel
         frame_db = args.redis_frame_channel
+
+        num_class_per_group = len(os.listdir(imgs_dirname))
 
         test(model_path)
     elif mode == 'fpr':
@@ -1204,6 +1099,10 @@ if __name__ == '__main__':
 
         num_class_per_group = len(label_list)
 
+        X = tf.placeholder(tf.float32, [None, input_height, input_width, num_channel])
+        Y = tf.placeholder(tf.float32, [None, num_class_per_group])
+
+        print('Number of Classes: ' + str(num_class_per_group))
         # Network setup
         cnn_representation, _, anchor_layer = encoder_network(X, bn_phaze=bn_train, activation='relu', scope='encoder')
         print('CNN Output Tensor Dimension: ' + str(cnn_representation.get_shape().as_list()))
@@ -1211,18 +1110,12 @@ if __name__ == '__main__':
         cnn_representation = layers.global_avg_pool(cnn_representation, representation_dim, scope='encoder')
         print('CNN Representation Dimension: ' + str(cnn_representation.get_shape().as_list()))
 
-        lstm_representation = lstm_network(LSTM_X, scope='lstm', forget_bias=1.0, keep_prob=keep_prob)
-
-        # representation = tf.concat([cnn_representation, lstm_representation], axis=1)
         representation = cnn_representation
 
         with tf.variable_scope('center', reuse=tf.AUTO_REUSE):
-            # centers = tf.get_variable('centers', [num_class_per_group, representation_dim + lstm_representation_dim],
-            #                          dtype=tf.float32,
-            #                          initializer=tf.constant_initializer(0), trainable=False)
             centers = tf.get_variable('centers', [num_class_per_group, representation_dim],
                                       dtype=tf.float32,
-                                      initializer=tf.constant_initializer(0), trainable=False)
+                                      initializer=tf.random_normal_initializer, trainable=False)
 
         smoothing_factor = 0.1
         prob_threshold = 1 - smoothing_factor
@@ -1233,18 +1126,14 @@ if __name__ == '__main__':
 
         # representation = tf.multiply(alpha, representation)
 
+        # [Batch, representation_dim]
+        #representation = tf.nn.l2_normalize(representation, axis=1)
+
         center_loss, center_distance_loss = get_center_loss(representation, tf.argmax(Y, 1))
         update_center = update_centers(representation, tf.argmax(Y, 1), CENTER_LOSS_ALPHA)
 
-        prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final')
+        prediction = layers.fc(representation, num_class_per_group, scope='g_fc_final_2')
 
-        entropy_loss = tf.reduce_mean(
-            tf.losses.softmax_cross_entropy(onehot_labels=Y, logits=prediction, label_smoothing=smoothing_factor))
-
-        class_loss = entropy_loss + center_loss * LAMBDA
-
-        # training operation
-        c_optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(class_loss)
         predict_op = tf.argmax(tf.nn.softmax(prediction), 1)
         confidence_op = tf.nn.softmax(prediction)
 
@@ -1281,17 +1170,10 @@ if __name__ == '__main__':
                     if len(img[0]) == 0:
                         print('No valid face')
                     else:
-                        # img = np.array(img).reshape(input_width, input_height, num_channel)
-                        grey_img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-                        # grey_img = cv2.resize(grey_img, dsize=(lstm_sequence_length, lstm_sequence_length))
-                        grey_img = np.array(grey_img).reshape(-1, lstm_sequence_length, lstm_sequence_length)
-
                         img = img / 255.0
-                        grey_img = grey_img / 255.0
 
                         pred_id, confidence = sess.run([predict_op, confidence_op],
-                                                       feed_dict={X: [img],
-                                                                  LSTM_X: grey_img, bn_train: False, keep_prob: 1.0})
+                                                       feed_dict={X: [img], bn_train: False, keep_prob: 1.0})
 
                         # idx = pred_id[0]
                         # center = c[idx]
@@ -1299,4 +1181,5 @@ if __name__ == '__main__':
 
                         print(
                             labelname + ', predict: ' + label_list[pred_id[0]] + ', ' + str(confidence[0][pred_id[0]]))
-                        #print(confidence)
+
+                        #print(l)
